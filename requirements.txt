@@ -1,3 +1,4 @@
+crewai
 'crewai[tools]'
 decouple
 langchain-community

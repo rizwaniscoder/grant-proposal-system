@@ -1,0 +1,4 @@
+crewai['tools']
+decouple
+langchain-community
+streamlit

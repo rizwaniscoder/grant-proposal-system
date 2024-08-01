@@ -7,9 +7,15 @@ import tempfile
 from crewai import Crew, Process
 from agents import CustomAgents
 from tasks import CustomTasks
-
+from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
+
+
 OpenAIGPT4mini = ChatOpenAI(model_name="gpt-4o-mini")
+groq_llm=ChatGroq(temperature=0,
+             model_name="llama3-70b-8192",
+             api_key=os.getenv("GROQ_API_KEY"))
+
 class StreamToExpander:
     def __init__(self, expander, buffer_limit=10000):
         self.expander = expander
@@ -40,8 +46,8 @@ st.set_page_config(
 st.title('Custom Crew AI Autonomous Grant Proposal System')
 
 # User inputs
-var1 = st.text_input('Enter variable 1')
-var2 = st.text_input('Enter variable 2')
+var1 = st.text_input('Please specify the project name')
+var2 = st.text_input('Please provide detailed instructions for the AI agents')
 
 # File uploader for multiple PDFs
 uploaded_pdfs = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
@@ -113,7 +119,7 @@ if st.button('Run Custom Crew'):
                 
             ],
             process=Process.hierarchical,
-            manager_llm=OpenAIGPT4mini,
+            manager_llm=groq_llm,
         )
 
         expander = st.expander("Crew Log")

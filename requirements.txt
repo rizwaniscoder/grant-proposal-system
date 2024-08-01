@@ -3,3 +3,4 @@ crewai[tools]
 decouple
 langchain-community
 streamlit
+langchain_groq

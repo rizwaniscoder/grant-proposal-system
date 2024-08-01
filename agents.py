@@ -2,10 +2,14 @@ from crewai import Agent
 from textwrap import dedent
 from langchain_openai import ChatOpenAI
 from crewai_tools import PDFSearchTool
+from langchain_groq import ChatGroq
+import os
 
 class CustomAgents:
     def __init__(self, pdf_paths):
         self.OpenAIGPT35 = ChatOpenAI(model_name="gpt-4o-mini")
+        self.groq_llm=ChatGroq(temperature=0,
+             model_name="llama3-70b-8192", api_key=os.getenv("GROQ_API_KEY"))
         self.OpenAIGPT4 = ChatOpenAI(model_name="gpt-4")
         self.pdf_tools = [PDFSearchTool(pdf=pdf_path) for pdf_path in pdf_paths]
 
@@ -21,7 +25,7 @@ class CustomAgents:
             tools=self.pdf_tools,
             allow_delegation=False,
             verbose=True,
-            llm=self.OpenAIGPT35,
+            llm=self.groq_llm,
         )
 
     def rfp_analysis_agent(self):
@@ -36,7 +40,7 @@ class CustomAgents:
             tools=self.pdf_tools,
             allow_delegation=False,
             verbose=True,
-            llm=self.OpenAIGPT35,
+            llm=self.groq_llm,
         )
 
     def mission_vision_agent(self):
@@ -51,7 +55,7 @@ class CustomAgents:
             tools=self.pdf_tools,
             allow_delegation=False,
             verbose=True,
-            llm=self.OpenAIGPT35,
+            llm=self.groq_llm,
         )
 
     def impact_research_agent(self):
@@ -66,7 +70,7 @@ class CustomAgents:
             tools=self.pdf_tools,
             allow_delegation=False,
             verbose=True,
-            llm=self.OpenAIGPT35,
+            llm=self.groq_llm,
         )
 
     def budget_analysis_agent(self):
@@ -81,7 +85,7 @@ class CustomAgents:
             tools=self.pdf_tools,
             allow_delegation=False,
             verbose=True,
-            llm=self.OpenAIGPT35,
+            llm=self.groq_llm,
         )
 
     def team_governance_agent(self):
@@ -96,7 +100,7 @@ class CustomAgents:
             tools=self.pdf_tools,
             allow_delegation=False,
             verbose=True,
-            llm=self.OpenAIGPT35,
+            llm=self.groq_llm,
         )
 
     def case_testimonial_agent(self):
@@ -111,7 +115,7 @@ class CustomAgents:
             tools=self.pdf_tools,
             allow_delegation=False,
             verbose=True,
-            llm=self.OpenAIGPT35,
+            llm=self.groq_llm,
         )
 
     def quality_integration_agent(self):
@@ -126,7 +130,7 @@ class CustomAgents:
             tools=self.pdf_tools,
             allow_delegation=False,
             verbose=True,
-            llm=self.OpenAIGPT35,
+            llm=self.groq_llm,
         )
 
     def formatting_submission_agent(self):
@@ -141,7 +145,7 @@ class CustomAgents:
             tools=self.pdf_tools,
             allow_delegation=False,
             verbose=True,
-            llm=self.OpenAIGPT35,
+            llm=self.groq_llm,
         )
 
     def project_manager_agent(self):
@@ -156,5 +160,5 @@ class CustomAgents:
             allow_delegation=True,
             tools=self.pdf_tools,
             verbose=True,
-            llm=self.OpenAIGPT35,
+            llm=self.groq_llm,
         )

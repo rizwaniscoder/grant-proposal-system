@@ -13,6 +13,7 @@ class CustomAgents:
         self.pdf_paths = pdf_paths
         self.groq_llm = None
         self.pdf_tools = {}
+        self.embeddings = None
 
     def get_groq_llm(self):
         if self.groq_llm is None:
@@ -23,14 +24,18 @@ class CustomAgents:
             )
         return self.groq_llm
 
+    def get_embeddings(self):
+        if self.embeddings is None:
+            self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        return self.embeddings
+
     def create_pdf_search_tool(self, pdf_path):
         if pdf_path not in self.pdf_tools:
             loader = PyPDFLoader(pdf_path)
             documents = loader.load()
             text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
             texts = text_splitter.split_documents(documents)
-            embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-            db = FAISS.from_documents(texts, embeddings)
+            db = FAISS.from_documents(texts, self.get_embeddings())
 
             self.pdf_tools[pdf_path] = Tool(
                 name=f"Search {pdf_path}",
@@ -64,90 +69,4 @@ class CustomAgents:
             llm=self.get_groq_llm(),
         )
 
-    def mission_vision_agent(self):
-        return Agent(
-            role="Expert Mission and Vision Writing Agent",
-            backstory="You are the world's best Mission and Vision Writing Agent, known for crafting compelling narratives that powerfully convey the nonprofit's mission, vision, and impact.",
-            goal="Craft compelling narratives around the nonprofit's mission, vision, and impact to engage and inspire funders.",
-            tools=self.get_pdf_tools(),
-            allow_delegation=False,
-            verbose=True,
-            llm=self.get_groq_llm(),
-        )
-
-    def impact_research_agent(self):
-        return Agent(
-            role="Expert Impact Research Agent",
-            backstory="You are the world's best Impact Research Agent, with extensive experience in gathering and analyzing data to demonstrate the impact of projects.",
-            goal="Gather and analyze impact data rigorously to support the nonprofit's case for funding.",
-            tools=self.get_pdf_tools(),
-            allow_delegation=False,
-            verbose=True,
-            llm=self.get_groq_llm(),
-        )
-
-    def budget_analysis_agent(self):
-        return Agent(
-            role="Expert Budget Analysis Agent",
-            backstory="You are the world's best Budget Analysis Agent, skilled in reviewing financial documents and creating persuasive budget narratives.",
-            goal="Review financial documents meticulously and create compelling budget narratives that align with the nonprofit's goals and funding requirements.",
-            tools=self.get_pdf_tools(),
-            allow_delegation=False,
-            verbose=True,
-            llm=self.get_groq_llm(),
-        )
-
-    def team_governance_agent(self):
-        return Agent(
-            role="Expert Team and Governance Writing Agent",
-            backstory="You are the world's best Team and Governance Writing Agent, adept at highlighting the strengths and qualifications of the nonprofit's team and governance.",
-            goal="Highlight the nonprofit's team and governance strengths effectively to demonstrate organizational capacity and credibility.",
-            tools=self.get_pdf_tools(),
-            allow_delegation=False,
-            verbose=True,
-            llm=self.get_groq_llm(),
-        )
-
-    def case_testimonial_agent(self):
-        return Agent(
-            role="Expert Case Statement and Testimonial Agent",
-            backstory="You are the world's best Case Statement and Testimonial Agent, with a knack for creating compelling case statements and collecting impactful testimonials.",
-            goal="Create compelling case statements and gather testimonials that effectively convey the impact and importance of the nonprofit's work.",
-            tools=self.get_pdf_tools(),
-            allow_delegation=False,
-            verbose=True,
-            llm=self.get_groq_llm(),
-        )
-
-    def quality_integration_agent(self):
-        return Agent(
-            role="Expert Quality Assurance and Integration Agent",
-            backstory="You are the world's best Quality Assurance and Integration Agent, ensuring consistency and quality across all outputs with a meticulous approach.",
-            goal="Ensure consistency and quality across all outputs, maintaining the highest standards of accuracy and coherence.",
-            tools=self.get_pdf_tools(),
-            allow_delegation=False,
-            verbose=True,
-            llm=self.get_groq_llm(),
-        )
-
-    def formatting_submission_agent(self):
-        return Agent(
-            role="Expert Formatting and Submission Agent",
-            backstory="You are the world's best Formatting and Submission Agent, organizing the final document based on agent outputs with precision and attention to detail.",
-            goal="Organize the final document based on agent outputs, ensuring it is formatted correctly and ready for submission.",
-            tools=self.get_pdf_tools(),
-            allow_delegation=False,
-            verbose=True,
-            llm=self.get_groq_llm(),
-        )
-
-    def project_manager_agent(self):
-        return Agent(
-            role="Expert Project Manager Agent",
-            backstory="You are the world's best Project Manager Agent, organizing tasks and overseeing the creation of the full grant proposal with unmatched efficiency and effectiveness.",
-            goal="Organize tasks and oversee the creation of the full grant proposal, ensuring all parts are cohesive and aligned with the project goals.",
-            allow_delegation=True,
-            tools=self.get_pdf_tools(),
-            verbose=True,
-            llm=self.get_groq_llm(),
-        )
+    # Other agent methods can be added back as needed, following the same pattern

@@ -25,3 +25,5 @@ langchain-core
 # Exclude problematic packages
 # boto3
 # botocore
+
+langchain-huggingface

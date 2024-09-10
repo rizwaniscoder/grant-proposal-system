@@ -1,4 +1,4 @@
-from crewai import Task
+from crewai import Agent, Task, Crew
 from textwrap import dedent
 
 class CustomTasks:

@@ -1,7 +1,7 @@
 # Core dependencies
 crewai==0.11.0
 crewai[tools]==0.11.0
-decouple==3.8
+python-decouple==3.8
 langchain-community==0.0.13
 streamlit==1.28.0
 langchain-groq==0.1.9

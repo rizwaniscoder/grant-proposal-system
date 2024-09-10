@@ -1,22 +1,25 @@
 # Core dependencies
 crewai==0.11.0
-langchain-community==0.0.13
+langchain-community>=0.0.13
 streamlit==1.28.0
-langchain-groq==0.1.9
+langchain-groq>=0.1.9
 
 # Vector stores and embeddings
-faiss-cpu==1.7.4
-sentence-transformers==2.2.2
+faiss-cpu
+sentence-transformers
 
 # PDF processing
-PyPDF2==3.0.1
+PyPDF2
 
 # Utility libraries
-python-decouple==3.8
-python-dotenv==1.0.0
-requests==2.31.0
+python-decouple
+python-dotenv
+requests
 
 # Additional CrewAI tools
-beautifulsoup4==4.12.2
-google-search-results==2.4.2
-duckduckgo-search==3.9.3
+beautifulsoup4
+google-search-results
+duckduckgo-search
+
+# Ensure compatible versions of core packages
+langchain-core>=0.2.26,<0.3.0

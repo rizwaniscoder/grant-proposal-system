@@ -1,21 +1,27 @@
+# Core dependencies
 crewai
-crewai[tools]
-python-decouple
-langchain-community
-langchain-huggingface
 streamlit
+
+# Language model and related tools
+langchain-community
 langchain-groq
 
+# Vector stores and embeddings
 faiss-cpu
 sentence-transformers
+
+# PDF processing
 PyPDF2
 
+# Utility libraries
+python-decouple
 python-dotenv
 requests
 
-beautifulsoup4
-google-search-results
-duckduckgo-search
+# Ensure compatible versions of core packages
+langchain
+langchain-core
 
-memory-profiler
-psutil
+# Exclude problematic packages
+# boto3
+# botocore

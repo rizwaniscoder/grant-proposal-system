@@ -35,7 +35,6 @@ class StreamToExpander:
             self.expander.markdown(''.join(self.buffer), unsafe_allow_html=True)
             self.buffer.clear()
 
-# Set page config
 st.set_page_config(
     page_title='Custom Crew AI',
     layout="centered"
@@ -43,11 +42,9 @@ st.set_page_config(
 
 st.title('Custom Crew AI Autonomous Grant Proposal System')
 
-# User inputs
 var1 = st.text_input('Please enter the name of the organization or company')
 var2 = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
 
-# File uploader for multiple PDFs
 uploaded_pdfs = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
 
 if st.button('Run Custom Crew'):
@@ -56,18 +53,15 @@ if st.button('Run Custom Crew'):
     elif not uploaded_pdfs:
         st.error("Please upload at least one PDF file.")
     else:
-        # Save uploaded PDFs to temporary files
         pdf_paths = []
         for uploaded_pdf in uploaded_pdfs:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                 tmp_file.write(uploaded_pdf.read())
                 pdf_paths.append(tmp_file.name)
         
-        # Initialize agents with PDF paths
         agents = CustomAgents(pdf_paths)
         tasks = CustomTasks()
         
-        # Set up agents and tasks
         document_ingestion_agent = agents.document_ingestion_agent()
         rfp_analysis_agent = agents.rfp_analysis_agent()
         mission_vision_agent = agents.mission_vision_agent()

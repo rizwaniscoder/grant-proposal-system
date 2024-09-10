@@ -11,7 +11,9 @@ class CustomTasks:
                 f"""
                 Process and organize uploaded files.
                 {self.__tip_section()}
-                Use these variables: {var1}, {var2}
+                Use these variables: 
+                Organization name: {var1}
+                RFP / Proposal background: {var2}
                 """
             ),
             agent=agent,
@@ -73,7 +75,7 @@ class CustomTasks:
         return Task(
             description=dedent(
                 f"""
-                Highlight the nonprofit’s team and governance strengths.
+                Highlight the nonprofit's team and governance strengths.
                 {self.__tip_section()}
                 """
             ),

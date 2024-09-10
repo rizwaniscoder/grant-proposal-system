@@ -2,6 +2,7 @@ crewai
 crewai[tools]
 python-decouple
 langchain-community
+langchain-huggingface
 streamlit
 langchain-groq
 

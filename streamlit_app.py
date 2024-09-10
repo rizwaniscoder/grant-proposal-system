@@ -4,8 +4,18 @@ import tempfile
 from crewai import Crew, Process
 from agents import CustomAgents
 from tasks import CustomTasks
+from langchain_groq import ChatGroq
 
-# Initialize session state for debug messages and pdf_paths
+# Use st.cache_resource for objects that should persist across reruns
+@st.cache_resource
+def get_groq_llm():
+    return ChatGroq(
+        temperature=0,
+        model_name="llama3-70b-8192",
+        api_key=os.getenv("GROQ_API_KEY")
+    )
+
+# Initialize session state
 if 'debug_messages' not in st.session_state:
     st.session_state.debug_messages = []
 if 'pdf_paths' not in st.session_state:
@@ -14,15 +24,12 @@ if 'pdf_paths' not in st.session_state:
 def add_debug_message(message):
     st.session_state.debug_messages.append(message)
 
-# Streamlit page configuration
 st.set_page_config(page_title='Custom Crew AI', layout="centered")
 st.title('Custom Crew AI Autonomous Grant Proposal System')
 
-# User inputs
 org_name = st.text_input('Please enter the name of the organization or company')
 proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
 
-# File uploader for PDFs
 uploaded_pdfs = st.file_uploader("Upload PDF files (max 200MB each)", type="pdf", accept_multiple_files=True)
 
 if st.button('Run Custom Crew'):
@@ -67,7 +74,7 @@ if st.button('Run Custom Crew'):
                     agents=[document_ingestion_agent, rfp_analysis_agent],
                     tasks=[document_ingestion_task, rfp_analysis_task],
                     process=Process.sequential,
-                    verbose=True
+                    manager_llm=get_groq_llm(),
                 )
 
                 add_debug_message("Starting Crew kickoff")

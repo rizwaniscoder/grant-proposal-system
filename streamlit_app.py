@@ -4,11 +4,12 @@ import tempfile
 from crewai import Crew, Process
 from agents import CustomAgents
 from tasks import CustomTasks
-from langchain_groq import ChatGroq
 
-# Initialize session state for debug messages
+# Initialize session state for debug messages and pdf_paths
 if 'debug_messages' not in st.session_state:
     st.session_state.debug_messages = []
+if 'pdf_paths' not in st.session_state:
+    st.session_state.pdf_paths = []
 
 def add_debug_message(message):
     st.session_state.debug_messages.append(message)
@@ -34,22 +35,22 @@ if st.button('Run Custom Crew'):
     else:
         add_debug_message(f"Number of PDFs uploaded: {len(uploaded_pdfs)}")
         
-        pdf_paths = []
+        st.session_state.pdf_paths = []
         for uploaded_pdf in uploaded_pdfs:
             try:
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                     tmp_file.write(uploaded_pdf.getvalue())
-                    pdf_paths.append(tmp_file.name)
+                    st.session_state.pdf_paths.append(tmp_file.name)
                 add_debug_message(f"Processed: {uploaded_pdf.name}")
             except Exception as e:
                 st.error(f"Error processing {uploaded_pdf.name}: {str(e)}")
         
-        add_debug_message(f"Total PDFs processed: {len(pdf_paths)}")
+        add_debug_message(f"Total PDFs processed: {len(st.session_state.pdf_paths)}")
         
-        if pdf_paths:
+        if st.session_state.pdf_paths:
             try:
                 add_debug_message("Initializing CustomAgents")
-                agents = CustomAgents(pdf_paths)
+                agents = CustomAgents(st.session_state.pdf_paths)
                 add_debug_message("Initializing CustomTasks")
                 tasks = CustomTasks()
                 
@@ -90,8 +91,12 @@ for msg in st.session_state.debug_messages:
     st.text(msg)
 
 # Clean up temporary files
-for path in pdf_paths:
+for path in st.session_state.pdf_paths:
     try:
         os.remove(path)
+        add_debug_message(f"Removed temporary file: {path}")
     except Exception as e:
         add_debug_message(f"Error removing temporary file {path}: {str(e)}")
+
+# Clear pdf_paths after processing
+st.session_state.pdf_paths = []

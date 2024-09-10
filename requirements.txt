@@ -5,6 +5,7 @@ streamlit
 # Language model and related tools
 langchain-community
 langchain-groq
+langchain-core
 
 # Vector stores and embeddings
 faiss-cpu
@@ -18,12 +19,11 @@ python-decouple
 python-dotenv
 requests
 
+# Hugging Face for embeddings
+transformers
+
+# Memory profiling (optional, for debugging)
+psutil
+
 # Ensure compatible versions of core packages
 langchain
-langchain-core
-
-# Exclude problematic packages
-# boto3
-# botocore
-
-langchain-huggingface

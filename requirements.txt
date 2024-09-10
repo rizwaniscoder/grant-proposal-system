@@ -1,6 +1,32 @@
-crewai
-crewai[tools]
-decouple
-langchain-community
-streamlit
-langchain_groq
+# Core dependencies
+crewai==0.11.0
+streamlit==1.28.0
+
+# Language models and tools
+langchain==0.0.350
+langchain-community==0.0.13
+langchain-groq==0.0.6
+
+# Vector stores and embeddings
+faiss-cpu==1.7.4
+sentence-transformers==2.2.2
+
+# PDF processing
+PyPDF2==3.0.1
+
+# Utility libraries
+python-dotenv==1.0.0
+requests==2.31.0
+
+# Additional CrewAI tools
+beautifulsoup4==4.12.2
+google-search-results==2.4.2
+duckduckgo-search==3.9.3
+
+# Streamlit extras (optional, for enhanced UI)
+streamlit-extras==0.3.5
+
+# Development tools (optional)
+black==23.10.0
+flake8==6.1.0
+isort==5.12.0

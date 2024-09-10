@@ -16,3 +16,6 @@ requests
 beautifulsoup4
 google-search-results
 duckduckgo-search
+
+memory-profiler
+psutil

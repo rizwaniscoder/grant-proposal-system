@@ -10,6 +10,8 @@ import sys
 import json
 import base64
 import logging
+import time
+from groq import RateLimitError
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +36,7 @@ class StreamToSt:
         self.st_component = st_component
 
     def write(self, content):
-        self.st_component.markdown(self.format_output(content))
+        self.st_component.markdown(self.format_output(content), unsafe_allow_html=True)
 
     def format_output(self, content):
         if content.startswith("Thought:"):
@@ -154,7 +156,20 @@ if st.button('Run Custom Crew'):
                 original_stdout = sys.stdout
                 sys.stdout = StreamToSt(crew_output)
                 
-                result = crew.kickoff()
+                max_retries = 3
+                retry_delay = 5
+                for attempt in range(max_retries):
+                    try:
+                        result = crew.kickoff()
+                        break
+                    except RateLimitError as e:
+                        if attempt < max_retries - 1:
+                            wait_time = retry_delay * (attempt + 1)
+                            st.warning(f"Rate limit reached. Retrying in {wait_time} seconds...")
+                            time.sleep(wait_time)
+                        else:
+                            st.error("Max retries reached. Please try again later.")
+                            raise e
                 
                 # Restore stdout
                 sys.stdout = original_stdout

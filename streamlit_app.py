@@ -5,8 +5,28 @@ from crewai import Crew, Process
 from agents import CustomAgents
 from tasks import CustomTasks
 from langchain_groq import ChatGroq
+import psutil
+import sys
+import json
+import base64
 
-# Use st.cache_resource for objects that should persist across reruns
+class StreamToExpander:
+    def __init__(self, expander):
+        self.expander = expander
+        self.buffer = []
+
+    def write(self, data):
+        self.buffer.append(data)
+        self.expander.text(''.join(self.buffer))
+
+    def flush(self):
+        pass
+
+def log_memory_usage():
+    process = psutil.Process(os.getpid())
+    mem_usage = process.memory_info().rss / 1024 ** 2  # in MB
+    st.sidebar.text(f"Memory usage: {mem_usage:.2f} MB")
+
 @st.cache_resource
 def get_groq_llm():
     return ChatGroq(
@@ -15,14 +35,19 @@ def get_groq_llm():
         api_key=os.getenv("GROQ_API_KEY")
     )
 
-# Initialize session state
 if 'debug_messages' not in st.session_state:
     st.session_state.debug_messages = []
-if 'pdf_paths' not in st.session_state:
-    st.session_state.pdf_paths = []
 
 def add_debug_message(message):
     st.session_state.debug_messages.append(message)
+    log_memory_usage()
+
+def get_binary_file_downloader_html(bin_file, file_label='File'):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    bin_str = base64.b64encode(data).decode()
+    href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
+    return href
 
 st.set_page_config(page_title='Custom Crew AI', layout="centered")
 st.title('Custom Crew AI Autonomous Grant Proposal System')
@@ -42,22 +67,22 @@ if st.button('Run Custom Crew'):
     else:
         add_debug_message(f"Number of PDFs uploaded: {len(uploaded_pdfs)}")
         
-        st.session_state.pdf_paths = []
+        pdf_paths = []
         for uploaded_pdf in uploaded_pdfs:
             try:
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                     tmp_file.write(uploaded_pdf.getvalue())
-                    st.session_state.pdf_paths.append(tmp_file.name)
+                    pdf_paths.append(tmp_file.name)
                 add_debug_message(f"Processed: {uploaded_pdf.name}")
             except Exception as e:
                 st.error(f"Error processing {uploaded_pdf.name}: {str(e)}")
         
-        add_debug_message(f"Total PDFs processed: {len(st.session_state.pdf_paths)}")
+        add_debug_message(f"Total PDFs processed: {len(pdf_paths)}")
         
-        if st.session_state.pdf_paths:
+        if pdf_paths:
             try:
                 add_debug_message("Initializing CustomAgents")
-                agents = CustomAgents(st.session_state.pdf_paths)
+                agents = CustomAgents(pdf_paths)
                 add_debug_message("Initializing CustomTasks")
                 tasks = CustomTasks()
                 
@@ -78,17 +103,53 @@ if st.button('Run Custom Crew'):
                 )
 
                 add_debug_message("Starting Crew kickoff")
+                
+                # Create an expander for CrewAI logs
+                crew_log_expander = st.expander("CrewAI Logs", expanded=True)
+                
+                # Redirect stdout to the expander
+                original_stdout = sys.stdout
+                sys.stdout = StreamToExpander(crew_log_expander)
+                
                 with st.spinner('Crew is working on your proposal...'):
                     result = crew.kickoff()
+                
+                # Restore original stdout
+                sys.stdout = original_stdout
                 
                 st.success("Crew has completed its tasks successfully!")
                 st.write("Crew Result:")
                 st.write(result)
+
+                # Save result to a file
+                with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp_file:
+                    json.dump(result, tmp_file, indent=2)
+                    tmp_file_name = tmp_file.name
+
+                # Provide download link
+                st.markdown(get_binary_file_downloader_html(tmp_file_name, 'Crew Result'), unsafe_allow_html=True)
             
             except Exception as e:
                 error_msg = f"An error occurred during crew execution: {str(e)}"
                 add_debug_message(error_msg)
                 st.error(error_msg)
+            
+            finally:
+                # Clean up temporary files
+                for path in pdf_paths:
+                    try:
+                        os.remove(path)
+                        add_debug_message(f"Removed temporary file: {path}")
+                    except Exception as e:
+                        add_debug_message(f"Error removing temporary file {path}: {str(e)}")
+                
+                # Clean up result file if it exists
+                if 'tmp_file_name' in locals():
+                    try:
+                        os.remove(tmp_file_name)
+                        add_debug_message(f"Removed temporary result file: {tmp_file_name}")
+                    except Exception as e:
+                        add_debug_message(f"Error removing temporary result file {tmp_file_name}: {str(e)}")
         else:
             st.error("No PDF files were successfully processed. Please try uploading them again.")
 
@@ -97,13 +158,4 @@ st.subheader("Debug Messages")
 for msg in st.session_state.debug_messages:
     st.text(msg)
 
-# Clean up temporary files
-for path in st.session_state.pdf_paths:
-    try:
-        os.remove(path)
-        add_debug_message(f"Removed temporary file: {path}")
-    except Exception as e:
-        add_debug_message(f"Error removing temporary file {path}: {str(e)}")
-
-# Clear pdf_paths after processing
-st.session_state.pdf_paths = []
+log_memory_usage()

@@ -1,12 +1,16 @@
 # Core dependencies
-crewai
 streamlit
+crewai
 
 # Language model and related tools
+langchain
 langchain-community
-langchain-groq
 langchain-core
+langchain-groq
 langchain-huggingface
+
+# LangSmith for tracing
+langsmith
 
 # Vector stores and embeddings
 faiss-cpu
@@ -23,8 +27,10 @@ requests
 # Hugging Face for embeddings
 transformers
 
-# Memory profiling (optional, for debugging)
+# Memory profiling and system utilities
 psutil
 
-# Ensure compatible versions of core packages
-langchain
+# Additional CrewAI tools (if needed)
+beautifulsoup4
+google-search-results
+duckduckgo-search

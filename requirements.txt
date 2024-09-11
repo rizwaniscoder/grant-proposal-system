@@ -6,6 +6,7 @@ streamlit
 langchain-community
 langchain-groq
 langchain-core
+langchain-huggingface
 
 # Vector stores and embeddings
 faiss-cpu

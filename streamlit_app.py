@@ -10,6 +10,17 @@ import sys
 import json
 import base64
 import re
+from langsmith import Client
+from langchain.callbacks.tracers.langchain import LangChainTracer
+from langchain.callbacks.manager import CallbackManager
+
+# LangSmith configuration
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
+# The API key is already set in Render environment variables
+
+# Initialize LangSmith client
+client = Client()
 
 class StreamToExpander:
     def __init__(self, expander):
@@ -51,10 +62,13 @@ def log_memory_usage():
 
 @st.cache_resource
 def get_groq_llm():
+    tracer = LangChainTracer()
+    callback_manager = CallbackManager([tracer])
     return ChatGroq(
         temperature=0,
         model_name="llama3-70b-8192",
-        api_key=os.getenv("GROQ_API_KEY")
+        api_key=os.getenv("GROQ_API_KEY"),
+        callback_manager=callback_manager
     )
 
 def get_binary_file_downloader_html(bin_file, file_label='File'):
@@ -116,28 +130,32 @@ if st.button('Run Custom Crew'):
                 document_ingestion_task = tasks.document_ingestion_task(document_ingestion_agent, org_name, proposal_background)
                 rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
 
-                add_debug_message("Creating Crew")
-                crew = Crew(
-                    agents=[document_ingestion_agent, rfp_analysis_agent],
-                    tasks=[document_ingestion_task, rfp_analysis_task],
-                    process=Process.sequential,
-                    manager_llm=get_groq_llm(),
-                )
+                # Create a new project run
+                project_name = "Grant Proposal System"
+                run_name = f"Proposal for {org_name}"
+                with client.new_project_run(project_name=project_name, run_name=run_name):
+                    add_debug_message("Creating Crew")
+                    crew = Crew(
+                        agents=[document_ingestion_agent, rfp_analysis_agent],
+                        tasks=[document_ingestion_task, rfp_analysis_task],
+                        process=Process.sequential,
+                        manager_llm=get_groq_llm(),
+                    )
 
-                add_debug_message("Starting Crew kickoff")
-                
-                # Create an expander for CrewAI logs
-                crew_log_expander = st.expander("CrewAI Logs", expanded=True)
-                
-                # Redirect stdout to the expander
-                original_stdout = sys.stdout
-                sys.stdout = StreamToExpander(crew_log_expander)
-                
-                with st.spinner('Crew is working on your proposal...'):
-                    result = crew.kickoff()
-                
-                # Restore original stdout
-                sys.stdout = original_stdout
+                    add_debug_message("Starting Crew kickoff")
+                    
+                    # Create an expander for CrewAI logs
+                    crew_log_expander = st.expander("CrewAI Logs", expanded=True)
+                    
+                    # Redirect stdout to the expander
+                    original_stdout = sys.stdout
+                    sys.stdout = StreamToExpander(crew_log_expander)
+                    
+                    with st.spinner('Crew is working on your proposal...'):
+                        result = crew.kickoff()
+                    
+                    # Restore original stdout
+                    sys.stdout = original_stdout
                 
                 st.success("Crew has completed its tasks successfully!")
                 
@@ -145,7 +163,7 @@ if st.button('Run Custom Crew'):
                 st.subheader("Crew Result:")
                 st.json(result)
 
-                # Provide download link for the result
+                # Provide a download link for the result
                 if result:
                     # Save result to a file
                     with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp_file:

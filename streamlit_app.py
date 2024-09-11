@@ -29,16 +29,24 @@ except Exception as e:
     logger.error(f"Error initializing LangSmith client: {str(e)}")
     client = None
 
-class StreamToLogger:
-    def __init__(self, level):
-        self.level = level
+class StreamToSt:
+    def __init__(self, st_component):
+        self.st_component = st_component
 
-    def write(self, message):
-        if message.strip():
-            self.level(message.strip())
+    def write(self, content):
+        self.st_component.markdown(self.format_output(content))
 
-    def flush(self):
-        pass
+    def format_output(self, content):
+        if content.startswith("Thought:"):
+            return f"🤔 **Thought:** {content[8:]}"
+        elif content.startswith("Action:"):
+            return f"🛠️ **Action:** {content[7:]}"
+        elif content.startswith("Action Input:"):
+            return f"📥 **Action Input:** {content[13:]}"
+        elif content.startswith("Observation:"):
+            return f"👁️ **Observation:** {content[12:]}"
+        else:
+            return content
 
 def log_memory_usage():
     process = psutil.Process(os.getpid())
@@ -72,12 +80,35 @@ def get_binary_file_downloader_html(bin_file, file_label='File'):
     return href
 
 st.set_page_config(page_title='Custom Crew AI', layout="centered")
-st.title('Custom Crew AI Autonomous Grant Proposal System')
+st.title('📋 RFP / Proposal Draft')
 
+st.markdown("## 🎯 Background")
 org_name = st.text_input('Please enter the name of the organization or company')
 proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
 
+st.markdown("## 📝 Grant Questions")
+st.markdown("""
+1. Tell us more about yourself or your organization. (150 words)
+2. How would you describe your project in a sentence? (50 words)
+3. What is the total project budget?
+4. For what type of work are you seeking support?*
+   • (Select) Purchase, implementation, and licensing of software (archival software, ticketing platforms, CRM software, etc.)
+5. Describe the activities that would be carried out with support from the Knight Art + Tech Expansion Fund. (250 Words)
+6. Describe the outcomes that would result from successfully implementing the activities described above. (250 Words)
+7. How will you know this project led to those outcomes?*
+""")
+
+st.markdown("## 📎 Uploaded Files")
 uploaded_pdfs = st.file_uploader("Upload PDF files (max 200MB each)", type="pdf", accept_multiple_files=True)
+for pdf in uploaded_pdfs:
+    st.write(f"• {pdf.name} ({pdf.size / 1024:.1f}KB)")
+
+st.markdown("## 📤 File Upload Instructions")
+st.markdown("""
+• Drag and drop files here
+• Limit 200MB per file
+• PDF format
+""")
 
 if st.button('Run Custom Crew'):
     logger.info("Run Custom Crew button clicked")
@@ -116,9 +147,6 @@ if st.button('Run Custom Crew'):
                 document_ingestion_task = tasks.document_ingestion_task(document_ingestion_agent, org_name, proposal_background)
                 rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
 
-                project_name = "Grant Proposal System"
-                run_name = f"Proposal for {org_name}"
-
                 logger.info("Creating Crew")
                 crew = Crew(
                     agents=[document_ingestion_agent, rfp_analysis_agent],
@@ -129,25 +157,27 @@ if st.button('Run Custom Crew'):
 
                 logger.info("Starting Crew kickoff")
                 
-                # Redirect stdout to logger
-                sys.stdout = StreamToLogger(logger.info)
-                sys.stderr = StreamToLogger(logger.error)
+                st.markdown("## 🔄 Status: Crew is working on your proposal...")
                 
-                with st.spinner('Crew is working on your proposal...'):
-                    result = crew.kickoff()
+                # Create a placeholder for the crew's output
+                crew_output = st.empty()
                 
-                # Restore stdout and stderr
+                # Redirect stdout to StreamToSt
+                sys.stdout = StreamToSt(crew_output)
+                
+                result = crew.kickoff()
+                
+                # Restore stdout
                 sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
                 
                 st.success("Crew has completed its tasks successfully!")
                 
-                # Display the full result
-                st.subheader("Crew Result:")
-                st.json(result)
-
-                # Provide download link for the result
+                st.markdown("## 📊 Results")
                 if result:
+                    for key, value in result.items():
+                        st.markdown(f"### {key}")
+                        st.write(value)
+
                     with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp_file:
                         json.dump(result, tmp_file, indent=2)
                         tmp_file_name = tmp_file.name

@@ -9,6 +9,7 @@ import psutil
 import sys
 import json
 import base64
+import re
 
 class StreamToExpander:
     def __init__(self, expander):
@@ -17,10 +18,31 @@ class StreamToExpander:
 
     def write(self, data):
         self.buffer.append(data)
-        self.expander.text(''.join(self.buffer))
+        formatted_output = self.format_output(''.join(self.buffer))
+        self.expander.markdown(formatted_output, unsafe_allow_html=True)
 
     def flush(self):
         pass
+
+    def format_output(self, text):
+        lines = text.split('\n')
+        formatted_lines = []
+        
+        for line in lines:
+            if line.startswith('Thought:'):
+                formatted_lines.append(f'<span style="color: blue;">{line}</span>')
+            elif line.startswith('Action:'):
+                formatted_lines.append(f'<span style="color: green;">{line}</span>')
+            elif line.startswith('Action Input:'):
+                formatted_lines.append(f'<span style="color: orange;">{line}</span>')
+            elif line.startswith('Observation:'):
+                formatted_lines.append(f'<span style="color: red;">{line}</span>')
+            elif line.startswith('Human:') or line.startswith('AI:'):
+                formatted_lines.append(f'<strong>{line}</strong>')
+            else:
+                formatted_lines.append(line)
+        
+        return '<br>'.join(formatted_lines)
 
 def log_memory_usage():
     process = psutil.Process(os.getpid())
@@ -35,19 +57,19 @@ def get_groq_llm():
         api_key=os.getenv("GROQ_API_KEY")
     )
 
-if 'debug_messages' not in st.session_state:
-    st.session_state.debug_messages = []
-
-def add_debug_message(message):
-    st.session_state.debug_messages.append(message)
-    log_memory_usage()
-
 def get_binary_file_downloader_html(bin_file, file_label='File'):
     with open(bin_file, 'rb') as f:
         data = f.read()
     bin_str = base64.b64encode(data).decode()
     href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
     return href
+
+if 'debug_messages' not in st.session_state:
+    st.session_state.debug_messages = []
+
+def add_debug_message(message):
+    st.session_state.debug_messages.append(message)
+    log_memory_usage()
 
 st.set_page_config(page_title='Custom Crew AI', layout="centered")
 st.title('Custom Crew AI Autonomous Grant Proposal System')
@@ -118,16 +140,23 @@ if st.button('Run Custom Crew'):
                 sys.stdout = original_stdout
                 
                 st.success("Crew has completed its tasks successfully!")
-                st.write("Crew Result:")
-                st.write(result)
+                
+                # Display the full result
+                st.subheader("Crew Result:")
+                st.json(result)
 
-                # Save result to a file
-                with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp_file:
-                    json.dump(result, tmp_file, indent=2)
-                    tmp_file_name = tmp_file.name
+                # Provide download link for the result
+                if result:
+                    # Save result to a file
+                    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp_file:
+                        json.dump(result, tmp_file, indent=2)
+                        tmp_file_name = tmp_file.name
 
-                # Provide download link
-                st.markdown(get_binary_file_downloader_html(tmp_file_name, 'Crew Result'), unsafe_allow_html=True)
+                    # Provide download link
+                    st.markdown(get_binary_file_downloader_html(tmp_file_name, 'Crew Result'), unsafe_allow_html=True)
+
+                    # Clean up the temporary file
+                    os.remove(tmp_file_name)
             
             except Exception as e:
                 error_msg = f"An error occurred during crew execution: {str(e)}"
@@ -142,14 +171,6 @@ if st.button('Run Custom Crew'):
                         add_debug_message(f"Removed temporary file: {path}")
                     except Exception as e:
                         add_debug_message(f"Error removing temporary file {path}: {str(e)}")
-                
-                # Clean up result file if it exists
-                if 'tmp_file_name' in locals():
-                    try:
-                        os.remove(tmp_file_name)
-                        add_debug_message(f"Removed temporary result file: {tmp_file_name}")
-                    except Exception as e:
-                        add_debug_message(f"Error removing temporary result file {tmp_file_name}: {str(e)}")
         else:
             st.error("No PDF files were successfully processed. Please try uploading them again.")
 

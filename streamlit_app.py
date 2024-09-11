@@ -86,18 +86,6 @@ st.markdown("## 🎯 Background")
 org_name = st.text_input('Please enter the name of the organization or company')
 proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
 
-st.markdown("## 📝 Grant Questions")
-st.markdown("""
-1. Tell us more about yourself or your organization. (150 words)
-2. How would you describe your project in a sentence? (50 words)
-3. What is the total project budget?
-4. For what type of work are you seeking support?*
-   • (Select) Purchase, implementation, and licensing of software (archival software, ticketing platforms, CRM software, etc.)
-5. Describe the activities that would be carried out with support from the Knight Art + Tech Expansion Fund. (250 Words)
-6. Describe the outcomes that would result from successfully implementing the activities described above. (250 Words)
-7. How will you know this project led to those outcomes?*
-""")
-
 st.markdown("## 📎 Uploaded Files")
 uploaded_pdfs = st.file_uploader("Upload PDF files (max 200MB each)", type="pdf", accept_multiple_files=True)
 for pdf in uploaded_pdfs:
@@ -163,12 +151,13 @@ if st.button('Run Custom Crew'):
                 crew_output = st.empty()
                 
                 # Redirect stdout to StreamToSt
+                original_stdout = sys.stdout
                 sys.stdout = StreamToSt(crew_output)
                 
                 result = crew.kickoff()
                 
                 # Restore stdout
-                sys.stdout = sys.__stdout__
+                sys.stdout = original_stdout
                 
                 st.success("Crew has completed its tasks successfully!")
                 

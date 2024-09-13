@@ -35,14 +35,17 @@ class StreamToSt:
     def __init__(self, st_component):
         self.st_component = st_component
         self.buffer = ""
+        self.last_output = ""
 
     def write(self, content):
         self.buffer += content
         if '\n' in self.buffer:
             lines = self.buffer.split('\n')
             for line in lines[:-1]:
-                self.st_component.markdown(self.format_output(line), unsafe_allow_html=True)
-                time.sleep(0.1)  # Add a small delay to allow for real-time updates
+                formatted = self.format_output(line)
+                if formatted != self.last_output:
+                    self.st_component.markdown(formatted, unsafe_allow_html=True)
+                    self.last_output = formatted
             self.buffer = lines[-1]
 
     def format_output(self, content):
@@ -54,8 +57,17 @@ class StreamToSt:
             return f"📥 **Action Input:** {content.split('Action Input:')[1].strip()}"
         elif "Observation:" in content:
             return f"👁️ **Observation:** {content.split('Observation:')[1].strip()}"
-        else:
-            return content
+        elif content.strip():  # Only return non-empty content
+            return f"ℹ️ {content.strip()}"
+        return ""
+
+    def flush(self):
+        if self.buffer:
+            formatted = self.format_output(self.buffer)
+            if formatted != self.last_output:
+                self.st_component.markdown(formatted, unsafe_allow_html=True)
+            self.buffer = ""
+            self.last_output = ""
 
 def log_memory_usage():
     process = psutil.Process(os.getpid())
@@ -156,49 +168,32 @@ if st.button('Run Custom Crew'):
                 
                 st.markdown("## 🔄 Status: Crew is working on your proposal...")
                 
-                # Create a placeholder for the crew's output
-                crew_output = st.empty()
-                
+                # Create a container for the crew's output
+                crew_output_container = st.container()
+
                 # Redirect stdout to StreamToSt
                 original_stdout = sys.stdout
-                sys.stdout = StreamToSt(crew_output)
-                
-                # Add this line to flush the output periodically
-                st.empty()
-                
-                max_retries = 3
-                retry_delay = 5
-                for attempt in range(max_retries):
-                    try:
-                        result = crew.kickoff()
-                        break
-                    except RateLimitError as e:
-                        if attempt < max_retries - 1:
-                            wait_time = retry_delay * (attempt + 1)
-                            st.warning(f"Rate limit reached. Retrying in {wait_time} seconds...")
-                            time.sleep(wait_time)
-                        else:
-                            st.error("Max retries reached. Please try again later.")
-                            raise e
-                
-                # Restore stdout
-                sys.stdout = original_stdout
-                
-                st.success("Crew has completed its tasks successfully!")
-                
-                st.markdown("## 📊 Results")
-                if result:
-                    for key, value in result.items():
-                        st.markdown(f"### {key}")
-                        st.write(value)
+                stream_to_st = StreamToSt(crew_output_container)
+                sys.stdout = stream_to_st
 
-                    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp_file:
-                        json.dump(result, tmp_file, indent=2)
-                        tmp_file_name = tmp_file.name
+                try:
+                    result = crew.kickoff()
+                finally:
+                    # Restore the original stdout and flush any remaining output
+                    sys.stdout = original_stdout
+                    stream_to_st.flush()
 
-                    st.markdown(get_binary_file_downloader_html(tmp_file_name, 'Crew Result'), unsafe_allow_html=True)
+                # Display the final result
+                st.markdown("## 📊 Analysis Result:")
+                st.write(result)
 
-                    os.remove(tmp_file_name)
+                with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp_file:
+                    json.dump(result, tmp_file, indent=2)
+                    tmp_file_name = tmp_file.name
+
+                st.markdown(get_binary_file_downloader_html(tmp_file_name, 'Crew Result'), unsafe_allow_html=True)
+
+                os.remove(tmp_file_name)
             
             except Exception as e:
                 error_msg = f"An error occurred during crew execution: {str(e)}"

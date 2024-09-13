@@ -35,18 +35,33 @@ class StreamToSt:
     def __init__(self, st_component):
         self.st_component = st_component
         self.buffer = ""
-        self.last_output = ""
+        self.current_section = None
+        self.content_buffer = []
 
     def write(self, content):
         self.buffer += content
         if '\n' in self.buffer:
             lines = self.buffer.split('\n')
             for line in lines[:-1]:
-                formatted = self.format_output(line)
-                if formatted != self.last_output:
-                    self.st_component.markdown(formatted, unsafe_allow_html=True)
-                    self.last_output = formatted
+                self.process_line(line)
             self.buffer = lines[-1]
+
+    def process_line(self, line):
+        if any(keyword in line for keyword in ["Thought:", "Action:", "Action Input:", "Observation:", "Final Answer:"]):
+            self.flush_content()
+            self.current_section = line.split(':')[0]
+            formatted = self.format_output(line)
+            self.st_component.markdown(f'<div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;">{formatted}', unsafe_allow_html=True)
+        elif self.current_section:
+            self.content_buffer.append(line.strip())
+
+    def flush_content(self):
+        if self.content_buffer:
+            content = " ".join(self.content_buffer)
+            self.st_component.markdown(content, unsafe_allow_html=True)
+            self.content_buffer = []
+        if self.current_section:
+            self.st_component.markdown("</div>", unsafe_allow_html=True)
 
     def format_output(self, content):
         if "Thought:" in content:
@@ -57,17 +72,17 @@ class StreamToSt:
             return f"📥 **Action Input:** {content.split('Action Input:')[1].strip()}"
         elif "Observation:" in content:
             return f"👁️ **Observation:** {content.split('Observation:')[1].strip()}"
-        elif content.strip():  # Only return non-empty content
-            return f"ℹ️ {content.strip()}"
-        return ""
+        elif "Final Answer:" in content:
+            return f"🎯 **Final Answer:** {content.split('Final Answer:')[1].strip()}"
+        else:
+            return content.strip()
 
     def flush(self):
         if self.buffer:
-            formatted = self.format_output(self.buffer)
-            if formatted != self.last_output:
-                self.st_component.markdown(formatted, unsafe_allow_html=True)
-            self.buffer = ""
-            self.last_output = ""
+            self.process_line(self.buffer)
+        self.flush_content()
+        self.buffer = ""
+        self.current_section = None
 
 def log_memory_usage():
     process = psutil.Process(os.getpid())

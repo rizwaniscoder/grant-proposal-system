@@ -51,7 +51,7 @@ class StreamToSt:
             self.flush_content()
             self.current_section = line.split(':')[0]
             formatted = self.format_output(line)
-            self.st_component.markdown(f'<div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;">{formatted}', unsafe_allow_html=True)
+            self.st_component.markdown(f'<div class="fadeIn" style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px;">{formatted}</div>', unsafe_allow_html=True)
         elif self.current_section:
             self.content_buffer.append(line.strip())
 
@@ -65,15 +65,16 @@ class StreamToSt:
 
     def format_output(self, content):
         if "Thought:" in content:
-            return f"🤔 **Thought:** {content.split('Thought:')[1].strip()}"
+            return f'<div style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;">🤔 <strong style="color: #2c3e50;">Thought:</strong></div> {content.split("Thought:")[1].strip()}'
         elif "Action:" in content:
-            return f"🛠️ **Action:** {content.split('Action:')[1].strip()}"
+            return f'<div style="background-color: #e6f3ff; padding: 5px; border-radius: 3px;">🛠️ <strong style="color: #3498db;">Action:</strong></div> {content.split("Action:")[1].strip()}'
         elif "Action Input:" in content:
-            return f"📥 **Action Input:** {content.split('Action Input:')[1].strip()}"
+            return f'<div style="background-color: #fff5e6; padding: 5px; border-radius: 3px;">📥 <strong style="color: #e67e22;">Action Input:</strong></div> {content.split("Action Input:")[1].strip()}'
         elif "Observation:" in content:
-            return f"👁️ **Observation:** {content.split('Observation:')[1].strip()}"
+            return f'<div style="background-color: #e6ffe6; padding: 5px; border-radius: 3px;">👁️ <strong style="color: #27ae60;">Observation:</strong></div> {content.split("Observation:")[1].strip()}'
         elif "Final Answer:" in content:
-            return f"🎯 **Final Answer:** {content.split('Final Answer:')[1].strip()}"
+            answer = content.split("Final Answer:")[1].strip()
+            return f'<div style="background-color: #ffe6e6; padding: 5px; border-radius: 3px;">🎯 <strong style="color: #e74c3c;">Final Answer:</strong></div>\n\n{answer}'
         else:
             return content.strip()
 
@@ -115,7 +116,19 @@ def get_binary_file_downloader_html(bin_file, file_label='File'):
     href = f'<a href="data:application/json;base64,{b64}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
     return href
 
-st.set_page_config(page_title='Custom Crew AI', layout="centered")
+st.set_page_config(page_title='Custom Crew AI', layout="wide")
+
+# Add CSS for animations
+st.markdown("""
+<style>
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.fadeIn { animation: fadeIn 0.5s ease-in; }
+</style>
+""", unsafe_allow_html=True)
+
 st.title('📋 RFP / Proposal Draft')
 
 st.markdown("## 🎯 Background")
@@ -177,6 +190,7 @@ if st.button('Run Custom Crew'):
                     tasks=[document_ingestion_task, rfp_analysis_task],
                     process=Process.sequential,
                     manager_llm=get_groq_llm(),
+                    verbose=2,
                 )
 
                 logger.info("Starting Crew kickoff")
@@ -191,8 +205,16 @@ if st.button('Run Custom Crew'):
                 stream_to_st = StreamToSt(crew_output_container)
                 sys.stdout = stream_to_st
 
+                crew_finished = False
                 try:
+                    with crew_output_container:
+                        with st.empty():
+                            while not crew_finished:
+                                st.spinner("Crew is still working...")
+                                time.sleep(0.1)
+                    
                     result = crew.kickoff()
+                    crew_finished = True
                     
                     # Convert CrewOutput to a dictionary
                     result_dict = {

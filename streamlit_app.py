@@ -109,10 +109,10 @@ def get_groq_llm():
         return None
 
 def get_binary_file_downloader_html(bin_file, file_label='File'):
-    with open(bin_file, 'rb') as f:
+    with open(bin_file, 'r') as f:
         data = f.read()
-    bin_str = base64.b64encode(data).decode()
-    href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
+    b64 = base64.b64encode(data.encode()).decode()
+    href = f'<a href="data:application/json;base64,{b64}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
     return href
 
 st.set_page_config(page_title='Custom Crew AI', layout="centered")
@@ -193,22 +193,35 @@ if st.button('Run Custom Crew'):
 
                 try:
                     result = crew.kickoff()
-                finally:
-                    # Restore the original stdout and flush any remaining output
-                    sys.stdout = original_stdout
-                    stream_to_st.flush()
+                    
+                    # Convert CrewOutput to a dictionary
+                    result_dict = {
+                        "final_output": result.final_output,
+                        "task_outputs": [
+                            {
+                                "task_name": task.name,
+                                "output": task.output
+                            } for task in result.tasks
+                        ]
+                    }
 
-                # Display the final result
-                st.markdown("## 📊 Analysis Result:")
-                st.write(result)
+                    # Display the final result
+                    st.markdown("## 📊 Analysis Result:")
+                    st.json(result_dict)
 
-                with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp_file:
-                    json.dump(result, tmp_file, indent=2)
-                    tmp_file_name = tmp_file.name
+                    # Save the result as JSON
+                    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp_file:
+                        json.dump(result_dict, tmp_file, indent=2)
+                        tmp_file_name = tmp_file.name
 
-                st.markdown(get_binary_file_downloader_html(tmp_file_name, 'Crew Result'), unsafe_allow_html=True)
+                    st.markdown(get_binary_file_downloader_html(tmp_file_name, 'Crew Result'), unsafe_allow_html=True)
 
-                os.remove(tmp_file_name)
+                    os.remove(tmp_file_name)
+
+                except Exception as e:
+                    error_msg = f"An error occurred during crew execution: {str(e)}"
+                    logger.error(error_msg)
+                    st.error(error_msg)
             
             except Exception as e:
                 error_msg = f"An error occurred during crew execution: {str(e)}"

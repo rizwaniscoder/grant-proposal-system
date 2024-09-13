@@ -34,19 +34,26 @@ except Exception as e:
 class StreamToSt:
     def __init__(self, st_component):
         self.st_component = st_component
+        self.buffer = ""
 
     def write(self, content):
-        self.st_component.markdown(self.format_output(content), unsafe_allow_html=True)
+        self.buffer += content
+        if '\n' in self.buffer:
+            lines = self.buffer.split('\n')
+            for line in lines[:-1]:
+                self.st_component.markdown(self.format_output(line), unsafe_allow_html=True)
+                time.sleep(0.1)  # Add a small delay to allow for real-time updates
+            self.buffer = lines[-1]
 
     def format_output(self, content):
-        if content.startswith("Thought:"):
-            return f"🤔 **Thought:** {content[8:]}"
-        elif content.startswith("Action:"):
-            return f"🛠️ **Action:** {content[7:]}"
-        elif content.startswith("Action Input:"):
-            return f"📥 **Action Input:** {content[13:]}"
-        elif content.startswith("Observation:"):
-            return f"👁️ **Observation:** {content[12:]}"
+        if "Thought:" in content:
+            return f"🤔 **Thought:** {content.split('Thought:')[1].strip()}"
+        elif "Action:" in content:
+            return f"🛠️ **Action:** {content.split('Action:')[1].strip()}"
+        elif "Action Input:" in content:
+            return f"📥 **Action Input:** {content.split('Action Input:')[1].strip()}"
+        elif "Observation:" in content:
+            return f"👁️ **Observation:** {content.split('Observation:')[1].strip()}"
         else:
             return content
 
@@ -155,6 +162,9 @@ if st.button('Run Custom Crew'):
                 # Redirect stdout to StreamToSt
                 original_stdout = sys.stdout
                 sys.stdout = StreamToSt(crew_output)
+                
+                # Add this line to flush the output periodically
+                st.empty()
                 
                 max_retries = 3
                 retry_delay = 5

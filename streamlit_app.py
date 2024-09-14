@@ -65,16 +65,16 @@ class StreamToSt:
 
     def format_output(self, content):
         if "Thought:" in content:
-            return f'<div style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;">🤔 <strong style="color: #2c3e50;">Thought:</strong></div> {content.split("Thought:")[1].strip()}'
+            return f'<div style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;"> <strong style="color: #2c3e50;">Thought:</strong></div> {content.split("Thought:")[1].strip()}'
         elif "Action:" in content:
-            return f'<div style="background-color: #e6f3ff; padding: 5px; border-radius: 3px;">🛠️ <strong style="color: #3498db;">Action:</strong></div> {content.split("Action:")[1].strip()}'
+            return f'<div style="background-color: #e6f3ff; padding: 5px; border-radius: 3px;"> <strong style="color: #3498db;">Action:</strong></div> {content.split("Action:")[1].strip()}'
         elif "Action Input:" in content:
-            return f'<div style="background-color: #fff5e6; padding: 5px; border-radius: 3px;">📥 <strong style="color: #e67e22;">Action Input:</strong></div> {content.split("Action Input:")[1].strip()}'
+            return f'<div style="background-color: #fff5e6; padding: 5px; border-radius: 3px;"> <strong style="color: #e67e22;">Action Input:</strong></div> {content.split("Action Input:")[1].strip()}'
         elif "Observation:" in content:
-            return f'<div style="background-color: #e6ffe6; padding: 5px; border-radius: 3px;">👁️ <strong style="color: #27ae60;">Observation:</strong></div> {content.split("Observation:")[1].strip()}'
+            return f'<div style="background-color: #e6ffe6; padding: 5px; border-radius: 3px;"> <strong style="color: #27ae60;">Observation:</strong></div> {content.split("Observation:")[1].strip()}'
         elif "Final Answer:" in content:
             answer = content.split("Final Answer:")[1].strip()
-            return f'<div style="background-color: #ffe6e6; padding: 5px; border-radius: 3px;">🎯 <strong style="color: #e74c3c;">Final Answer:</strong></div>\n\n{answer}'
+            return f'<div style="background-color: #ffe6e6; padding: 5px; border-radius: 3px;"> <strong style="color: #e74c3c;">Final Answer:</strong></div>\n\n{answer}'
         else:
             return content.strip()
 
@@ -132,22 +132,21 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title('📋 RFP / Proposal Draft')
+st.title(' RFP / Proposal Draft')
 
 st.markdown("## Background")
 org_name = st.text_input('Please enter the name of the organization or company')
 proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
 
-st.markdown("## 📎 Uploaded Files")
+st.markdown("## Uploaded Files")
 uploaded_pdfs = st.file_uploader("Upload PDF files (max 200MB each)", type="pdf", accept_multiple_files=True)
 for pdf in uploaded_pdfs:
-    st.write(f"• {pdf.name} ({pdf.size / 1024:.1f}KB)")
+    st.write(f" {pdf.name} ({pdf.size / 1024:.1f}KB)")
 
-st.markdown("## 📤 File Upload Instructions")
+st.markdown("## File Upload Instructions")
 st.markdown("""
-• Drag and drop files here
-• Limit 200MB per file
-• PDF format
+ Limit 200MB per file
+ PDF format
 """)
 
 if st.button('Run Custom Crew'):
@@ -197,14 +196,12 @@ if st.button('Run Custom Crew'):
                 crew = Crew(
                     agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
                     tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
-                    process=Process.sequential,
-                    manager_llm=get_groq_llm(),
-                    verbose=True,  # Change this from 2 to True
+                    verbose=True
                 )
 
                 logger.info("Starting Crew kickoff")
                 
-                st.markdown("## 🔄 Status: Crew is working on your proposal...")
+                st.markdown(" Status: Crew is working on your proposal...")
                 
                 # Create a container for the crew's output
                 crew_output_container = st.container()
@@ -215,22 +212,19 @@ if st.button('Run Custom Crew'):
                 sys.stdout = stream_to_st
 
                 try:
-                    for task in crew.tasks:
-                        task_result = task.execute()
-                        st.markdown(f"## Task Completed: {task.name}")
-                        st.write(task_result)
-                        if st.button("Continue to next task"):
-                            continue
-                        else:
-                            st.stop()
-                    result = crew.get_final_output()
-                finally:
-                    # Restore the original stdout and flush any remaining output
-                    sys.stdout = original_stdout
-                    stream_to_st.flush()
-
+                    result = crew.kickoff()
+                    st.markdown("## Proposal Generation Complete")
+                    st.write(result)
+                except RateLimitError:
+                    st.error("Rate limit reached. Waiting before retrying...")
+                    time.sleep(60)  # Wait for 60 seconds before retrying
+                except Exception as e:
+                    error_msg = f"An error occurred during crew execution: {str(e)}"
+                    logger.error(error_msg)
+                    st.error(error_msg)
+                
                 # Display the final result
-                st.markdown("## 📊 Analysis Result:")
+                st.markdown("## Analysis Result:")
                 
                 # Convert CrewOutput to a dictionary
                 result_dict = {

@@ -243,17 +243,16 @@ if st.button('Run Custom Crew'):
                                 time.sleep(retry_delay)
                             else:
                                 st.error("Max retries reached due to rate limits. Please try again later.")
-                                return
-                    
-                    st.markdown("## Analysis Result:")
-                    st.json(json.dumps({
-                        "final_output": result.final_output,
-                        "tasks": [{"task_name": task.name, "output": task.output} for task in result.tasks]
-                    }, indent=2))
+                                st.stop()  # Use st.stop() instead of return
                 except Exception as e:
                     st.error(f"An error occurred during crew execution: {str(e)}")
                     logger.error(f"Crew execution error: {str(e)}")
 
+                st.markdown("## Analysis Result:")
+                st.json(json.dumps({
+                    "final_output": result.final_output,
+                    "tasks": [{"task_name": task.name, "output": task.output} for task in result.tasks]
+                }, indent=2))
             except Exception as e:
                 error_msg = f"An error occurred during crew setup: {str(e)}"
                 logger.error(error_msg)

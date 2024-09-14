@@ -13,6 +13,7 @@ import logging
 import time
 from groq import RateLimitError
 import re
+from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -40,12 +41,16 @@ class StreamToSt:
         self.content_buffer = []
 
     def write(self, content):
-        self.buffer += content
-        if '\n' in self.buffer:
-            lines = self.buffer.split('\n')
-            for line in lines[:-1]:
-                self.process_line(line)
-            self.buffer = lines[-1]
+        if isinstance(content, str):
+            self.buffer += content
+            if '\n' in self.buffer:
+                lines = self.buffer.split('\n')
+                for line in lines[:-1]:
+                    self.process_line(line)
+                self.buffer = lines[-1]
+        else:
+            # Handle non-string content
+            self.st_component.write(content)
 
     def process_line(self, line):
         if any(keyword in line for keyword in ["Thought:", "Action:", "Action Input:", "Observation:", "Final Answer:"]):
@@ -59,10 +64,16 @@ class StreamToSt:
     def flush_content(self):
         if self.content_buffer:
             content = " ".join(self.content_buffer)
-            self.st_component.markdown(content, unsafe_allow_html=True)
+            try:
+                self.st_component.markdown(content, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error displaying content: {str(e)}")
             self.content_buffer = []
         if self.current_section:
-            self.st_component.markdown("</div>", unsafe_allow_html=True)
+            try:
+                self.st_component.markdown("</div>", unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error closing section: {str(e)}")
 
     def format_output(self, content):
         if "Thought:" in content:
@@ -162,14 +173,19 @@ if st.button('Run Custom Crew'):
         logger.info(f"Number of PDFs uploaded: {len(uploaded_pdfs)}")
         
         pdf_paths = []
-        for uploaded_pdf in uploaded_pdfs:
-            try:
+        try:
+            for uploaded_pdf in uploaded_pdfs:
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                     tmp_file.write(uploaded_pdf.getvalue())
                     pdf_paths.append(tmp_file.name)
                 logger.info(f"Processed: {uploaded_pdf.name}")
-            except Exception as e:
-                st.error(f"Error processing {uploaded_pdf.name}: {str(e)}")
+        finally:
+            for path in pdf_paths:
+                try:
+                    os.remove(path)
+                    logger.info(f"Removed temporary file: {path}")
+                except Exception as e:
+                    logger.error(f"Error removing temporary file {path}: {str(e)}")
         
         logger.info(f"Total PDFs processed: {len(pdf_paths)}")
         
@@ -203,65 +219,43 @@ if st.button('Run Custom Crew'):
 
                 logger.info("Starting Crew kickoff")
                 
-                st.markdown(" Status: Crew is working on your proposal...")
-                
-                # Create a container for the crew's output
-                crew_output_container = st.container()
+                st.markdown("## 🔄 Status: Crew is working on your proposal...")
+                progress_bar = st.progress(0)
+                crew_output_container = st.empty()
 
-                # Redirect stdout to StreamToSt
-                original_stdout = sys.stdout
-                stream_to_st = StreamToSt(crew_output_container)
-                sys.stdout = stream_to_st
+                def update_progress(progress):
+                    progress_bar.progress(progress)
 
-                max_attempts = 5
-                for attempt in range(max_attempts):
-                    try:
-                        result = crew.kickoff()
-                        break
-                    except RateLimitError:
-                        if attempt < max_attempts - 1:
-                            wait_time = exponential_backoff(attempt)
-                            st.warning(f"Rate limit reached. Waiting {wait_time} seconds before retrying...")
-                            time.sleep(wait_time)
-                        else:
-                            st.error("Max retries reached. Please try again later.")
-                            return
+                # Wrap the crew.kickoff() call with the progress bar update
+                add_script_run_ctx(update_progress)
 
-                final_answer = result.final_output  # Assuming this contains the formatted text from Groq
-
-                st.markdown("## Final Answer:")
-                st.markdown(f"""
-                <div style="border:1px solid #ccc; padding:10px; border-radius:5px;">
-
-                {final_answer}
-
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.markdown("## Analysis Result:")
-                
-                # Convert CrewOutput to a dictionary
-                result_dict = {
-                    "final_output": result.final_output,
-                    "tasks": [
-                        {
-                            "task_name": task.name,
-                            "output": task.output
-                        } for task in result.tasks
-                    ]
-                }
-                
-                st.json(json.dumps(result_dict, indent=2))
-
-                # Save the result as a JSON file
-                with open("proposal_result.json", "w") as f:
-                    json.dump(result_dict, f, indent=2)
-
-                # Provide a download link for the JSON file
-                st.markdown(get_binary_file_downloader_html("proposal_result.json", "Download Proposal Result"), unsafe_allow_html=True)
+                try:
+                    max_retries = 3
+                    retry_delay = 60  # seconds
+                    for attempt in range(max_retries):
+                        try:
+                            result = crew.kickoff()
+                            crew_output_container.markdown(result.final_output)
+                            break
+                        except RateLimitError:
+                            if attempt < max_retries - 1:
+                                st.warning(f"Rate limit reached. Waiting {retry_delay} seconds before retrying...")
+                                time.sleep(retry_delay)
+                            else:
+                                st.error("Max retries reached due to rate limits. Please try again later.")
+                                return
+                    
+                    st.markdown("## Analysis Result:")
+                    st.json(json.dumps({
+                        "final_output": result.final_output,
+                        "tasks": [{"task_name": task.name, "output": task.output} for task in result.tasks]
+                    }, indent=2))
+                except Exception as e:
+                    st.error(f"An error occurred during crew execution: {str(e)}")
+                    logger.error(f"Crew execution error: {str(e)}")
 
             except Exception as e:
-                error_msg = f"An error occurred during crew execution: {str(e)}"
+                error_msg = f"An error occurred during crew setup: {str(e)}"
                 logger.error(error_msg)
                 st.error(error_msg)
             

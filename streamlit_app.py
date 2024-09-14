@@ -12,6 +12,7 @@ import base64
 import logging
 import time
 from groq import RateLimitError
+import re
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -100,7 +101,7 @@ def get_groq_llm():
             callback_manager = None
         
         return ChatGroq(
-            temperature=0,
+            temperature=0.5,  # Lower temperature
             model_name="llama3-70b-8192",
             api_key=os.getenv("GROQ_API_KEY"),
             callback_manager=callback_manager
@@ -115,6 +116,13 @@ def get_binary_file_downloader_html(bin_file, file_label='File'):
     b64 = base64.b64encode(data.encode()).decode()
     href = f'<a href="data:application/json;base64,{b64}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
     return href
+
+# Function to preprocess the output
+def preprocess_output(text):
+    # Remove or explain the symbols/numbers
+    text = re.sub(r'\[\d+m', '', text)  # Remove color codes
+    text = re.sub(r'\[\d+;\d+m', '', text)  # Remove more complex color codes
+    return text
 
 # Set page config
 st.set_page_config(page_title='Custom Crew AI', layout="centered")
@@ -139,15 +147,9 @@ org_name = st.text_input('Please enter the name of the organization or company')
 proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
 
 st.markdown("## Uploaded Files")
-uploaded_pdfs = st.file_uploader("Upload PDF files (max 200MB each)", type="pdf", accept_multiple_files=True)
+uploaded_pdfs = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
 for pdf in uploaded_pdfs:
     st.write(f" {pdf.name} ({pdf.size / 1024:.1f}KB)")
-
-st.markdown("## File Upload Instructions")
-st.markdown("""
- Limit 200MB per file
- PDF format
-""")
 
 if st.button('Run Custom Crew'):
     logger.info("Run Custom Crew button clicked")
@@ -211,19 +213,31 @@ if st.button('Run Custom Crew'):
                 stream_to_st = StreamToSt(crew_output_container)
                 sys.stdout = stream_to_st
 
-                try:
-                    result = crew.kickoff()
-                    st.markdown("## Proposal Generation Complete")
-                    st.write(result)
-                except RateLimitError:
-                    st.error("Rate limit reached. Waiting before retrying...")
-                    time.sleep(60)  # Wait for 60 seconds before retrying
-                except Exception as e:
-                    error_msg = f"An error occurred during crew execution: {str(e)}"
-                    logger.error(error_msg)
-                    st.error(error_msg)
+                max_attempts = 5
+                for attempt in range(max_attempts):
+                    try:
+                        result = crew.kickoff()
+                        break
+                    except RateLimitError:
+                        if attempt < max_attempts - 1:
+                            wait_time = exponential_backoff(attempt)
+                            st.warning(f"Rate limit reached. Waiting {wait_time} seconds before retrying...")
+                            time.sleep(wait_time)
+                        else:
+                            st.error("Max retries reached. Please try again later.")
+                            return
+
+                final_answer = result.final_output  # Assuming this contains the formatted text from Groq
+
+                st.markdown("## Final Answer:")
+                st.markdown(f"""
+                <div style="border:1px solid #ccc; padding:10px; border-radius:5px;">
+
+                {final_answer}
+
+                </div>
+                """, unsafe_allow_html=True)
                 
-                # Display the final result
                 st.markdown("## Analysis Result:")
                 
                 # Convert CrewOutput to a dictionary

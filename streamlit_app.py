@@ -302,8 +302,8 @@ if st.button('Draft Proposal'):
 
 # Graceful shutdown
 try:
-    # st.title('ProposalCraft')
-    # ... rest of your app ...
+    # Your main app code goes here
+    pass
 except KeyboardInterrupt:
     st.write("Shutting down gracefully...")
 finally:

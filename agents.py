@@ -1,6 +1,6 @@
 from crewai import Agent
 from langchain.tools import Tool
-from langchain.llms import Groq
+from langchain_groq import ChatGroq as Groq
 
 class CustomAgents:
     def __init__(self, pdf_paths):

@@ -239,7 +239,7 @@ if st.button('Draft Proposal'):
         rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
         proposal_writing_task = tasks.proposal_writing_task(proposal_writer_agent, "{{rfp_analysis_task.output}}", org_name)
         budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}", total_budget)
-        quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}", "{{budget_preparation_task.output}}")
+        quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}\n{{budget_preparation_task.output}}")
 
         # Create crew
         crew = Crew(
@@ -248,27 +248,49 @@ if st.button('Draft Proposal'):
             verbose=True
         )
 
-        st.info("Starting the crew. This process may take several minutes depending on the complexity of your documents and requirements. Please wait while our AI agents analyze and generate your proposal draft.")
-        
         # Create a placeholder for live updates
         output_placeholder = st.empty()
-        stream_handler = StreamToSt(output_placeholder)
 
-        # Redirect stdout to our custom stream handler
-        sys.stdout = stream_handler
+        # Create a function to update the output
+        def update_output(message, output_type="info"):
+            if output_type == "thought":
+                output_placeholder.markdown(f"🤔 **Thought:** {message}")
+            elif output_type == "action":
+                output_placeholder.markdown(f"🛠️ **Action:** {message}")
+            elif output_type == "observation":
+                output_placeholder.markdown(f"👁️ **Observation:** {message}")
+            elif output_type == "final_answer":
+                output_placeholder.markdown(f"🎯 **Final Answer:** {message}")
+            else:
+                output_placeholder.markdown(message)
+            time.sleep(0.1)  # Small delay to prevent overwhelming the UI
+
+        progress_bar = st.progress(0)
+
+        def update_progress(current_step, total_steps):
+            progress = int((current_step / total_steps) * 100)
+            progress_bar.progress(progress)
+
+        crew = Crew(
+            agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
+            tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
+            verbose=True,
+            callback=update_progress
+        )
 
         # Run the crew
         with st.spinner("CrewAI Job in Progress..."):
-            result = crew.kickoff()
+            for step in crew.kickoff():
+                if isinstance(step, dict):
+                    for key, value in step.items():
+                        update_output(value, key)
+                else:
+                    update_output(str(step))
 
-        # Reset stdout
-        sys.stdout = sys.__stdout__
+            result = crew.get_final_output()  # Assuming there's a method to get the final result
 
-        # Flush any remaining content
-        stream_handler.flush()
-        
         st.success("CrewAI Job Completed!")
-        
+
         # Process and display results
         st.subheader("📄 Final Proposal Draft")
         st.markdown(result)
@@ -301,9 +323,7 @@ if st.button('Draft Proposal'):
 if __name__ == "__main__":
     try:
         # Your main app code goes here
-        st.title('📋 ProposalCraft')
-        st.markdown('Generate comprehensive proposal drafts using AI analysis of your RFP documents.')
-        # ... (rest of your main app code)
+        pass  # Remove this if you have actual code to run
     except KeyboardInterrupt:
         st.write("Shutting down gracefully...")
     finally:

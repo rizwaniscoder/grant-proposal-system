@@ -171,11 +171,14 @@ if uploaded_pdfs:
 if st.button('Run Custom Crew'):
     logger.info("Run Custom Crew button clicked")
     
-    if not org_name or not proposal_background:
-        st.error("Please enter both the organization name and background information on the RFP / proposal.")
-    elif not uploaded_pdfs:
-        st.error("Please upload at least one PDF file.")
-    else:
+    try:
+        if not org_name or not proposal_background:
+            st.error("Please enter both the organization name and background information on the RFP / proposal.")
+            st.stop()
+        elif not uploaded_pdfs:
+            st.error("Please upload at least one PDF file.")
+            st.stop()
+        
         logger.info(f"Number of PDFs uploaded: {len(uploaded_pdfs)}")
         
         pdf_paths = []
@@ -187,7 +190,7 @@ if st.button('Run Custom Crew'):
                 logger.info(f"Processed: {uploaded_pdf.name}")
         except Exception as e:
             st.error(f"Error processing uploaded files: {str(e)}")
-            return
+            st.stop()
         finally:
             for path in pdf_paths:
                 try:
@@ -273,4 +276,9 @@ if st.button('Run Custom Crew'):
         else:
             st.error("No PDF files were successfully processed. Please try uploading them again.")
 
-log_memory_usage()
+    except Exception as e:
+        error_msg = f"An unexpected error occurred: {str(e)}"
+        logger.error(error_msg)
+        st.error(error_msg)
+    finally:
+        log_memory_usage()

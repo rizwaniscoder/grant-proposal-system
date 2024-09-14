@@ -190,9 +190,7 @@ The more comprehensive and relevant the uploaded documents, the better the AI-ge
 uploaded_pdfs = st.file_uploader("Drag and drop files here", type="pdf", accept_multiple_files=True)
 
 if uploaded_pdfs:
-    st.write(f"Uploaded {len(uploaded_pdfs)} file(s):")
-    for pdf in uploaded_pdfs:
-        st.write(f"- {pdf.name}")
+    st.success(f"Successfully uploaded {len(uploaded_pdfs)} file(s).")
 
 if st.button('Draft Proposal'):
     logger.info("Draft Proposal button clicked")
@@ -303,7 +301,7 @@ if st.button('Draft Proposal'):
 
 # Graceful shutdown
 try:
-    st.title('ProposalCraft')
+    # st.title('ProposalCraft')
     # ... rest of your app ...
 except KeyboardInterrupt:
     st.write("Shutting down gracefully...")

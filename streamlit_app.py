@@ -16,6 +16,7 @@ import re
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 from io import StringIO
 import threading
+from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 # LangSmith configuration
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
+os.environ["LANGCHAIN_API_KEY"] = "your_langsmith_api_key"
 
 try:
     from langsmith import Client
@@ -113,7 +115,6 @@ def get_groq_llm():
             callback_manager = CallbackManager([tracer])
         else:
             callback_manager = None
-        
         return ChatGroq(
             temperature=0.2,  # Lower temperature
             model_name="llama3-70b-8192",
@@ -156,14 +157,24 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title('📋 RFP / Proposal Draft')
+st.title('📋 ProposalCraft')
 
 st.markdown("## 🎯 Background")
 org_name = st.text_input('Please enter the name of the organization or company')
 proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
 
-st.markdown("## 📁 Uploaded Files")
-uploaded_pdfs = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
+st.subheader("📁 Upload Relevant Documents")
+st.markdown("""
+Upload PDF files (max 200MB each) that contain:
+- Background information about your organization/company
+- Details about the core elements of your proposal
+- Any relevant RFP (Request for Proposal) documents
+
+The more comprehensive and relevant the uploaded documents, the better the AI-generated proposal will be.
+""")
+
+# File uploader widget
+uploaded_pdfs = st.file_uploader("Drag and drop files here", type="pdf", accept_multiple_files=True)
 
 # Process the uploaded files without displaying them again
 if uploaded_pdfs:
@@ -171,7 +182,7 @@ if uploaded_pdfs:
         # Process the PDF file here
         pass
 
-if st.button('Run Custom Crew'):
+if st.button('Draft Proposal'):
     logger.info("Run Custom Crew button clicked")
     
     try:
@@ -232,8 +243,8 @@ if st.button('Run Custom Crew'):
                     verbose=True
                 )
 
-                logger.info("Starting Crew kickoff")
-
+                logger.info("About to start crew kickoff")
+                st.info("Starting CrewAI job...")
                 st.header("🚀 CrewAI Job in Progress")
                 progress_bar = st.progress(0)
                 start_time = time.time()
@@ -252,7 +263,15 @@ if st.button('Run Custom Crew'):
                             progress_bar.progress(progress)
                             time.sleep(0.1)
                     
-                    result = crew.kickoff()
+                    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
+                    def execute_with_retry(func, *args, **kwargs):
+                        try:
+                            return func(*args, **kwargs)
+                        except RateLimitError as e:
+                            logger.warning(f"Rate limit hit, retrying: {str(e)}")
+                            raise
+
+                    result = execute_with_retry(crew.kickoff)
                     crew_finished = True
                     progress_bar.progress(100)
                     st.success("CrewAI Job Completed!")
@@ -263,9 +282,12 @@ if st.button('Run Custom Crew'):
                     }
 
                 except Exception as e:
-                    error_msg = f"An error occurred during crew setup: {str(e)}"
+                    error_msg = f"An error occurred during crew execution: {str(e)}"
                     logger.error(error_msg)
                     st.error(error_msg)
+                    # Log the full traceback for debugging
+                    import traceback
+                    logger.error(traceback.format_exc())
                 
                 finally:
                     for path in pdf_paths:
@@ -295,3 +317,14 @@ if st.button('Run Custom Crew'):
         st.error(error_msg)
     finally:
         log_memory_usage()
+
+try:
+    # Your Streamlit app code here
+    st.title('CrewAI Job')
+    # ... rest of your app ...
+
+except KeyboardInterrupt:
+    st.write("Shutting down gracefully...")
+    # Perform any necessary cleanup here
+finally:
+    st.stop()

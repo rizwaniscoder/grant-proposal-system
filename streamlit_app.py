@@ -142,19 +142,24 @@ def preprocess_output(text):
 # Set page config
 st.set_page_config(page_title='Custom Crew AI', layout="centered")
 
-# Add CSS for animations and set max-width
+# Custom CSS to make the whole page scrollable and hide the Streamlit container's scrollbar
 st.markdown("""
-<style>
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-.fadeIn { animation: fadeIn 0.5s ease-in; }
-.stApp {
-    max-width: 800px;
-    margin: 0 auto;
-}
-</style>
+    <style>
+    #root > div:nth-child(1) > div > div > div > div > section.main.css-uf99v8.egzxvld5 {
+        overflow: visible;
+    }
+    .stApp {
+        overflow-y: auto;
+        height: 100vh;
+    }
+    @keyframes fadeIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+    }
+    .fadeIn {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    </style>
 """, unsafe_allow_html=True)
 
 st.title('📋 ProposalCraft')
@@ -163,24 +168,14 @@ st.markdown("## 🎯 Background")
 org_name = st.text_input('Please enter the name of the organization or company')
 proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
 
-st.subheader("📁 Upload Relevant Documents")
-st.markdown("""
-Upload PDF files (max 200MB each) that contain:
-- Background information about your organization/company
-- Details about the core elements of your proposal
-- Any relevant RFP (Request for Proposal) documents
+st.markdown("## 💰 Total Budget")
+total_budget = st.number_input("Enter the total budget for the proposal:", min_value=0, step=1000, format="%d")
+if total_budget <= 0:
+    st.error("Please enter a valid total budget.")
+    st.stop()
 
-The more comprehensive and relevant the uploaded documents, the better the AI-generated proposal will be.
-""")
-
-# File uploader widget
-uploaded_pdfs = st.file_uploader("Drag and drop files here", type="pdf", accept_multiple_files=True)
-
-# Process the uploaded files without displaying them again
-if uploaded_pdfs:
-    for pdf in uploaded_pdfs:
-        # Process the PDF file here
-        pass
+st.markdown("## 📁 Uploaded Files")
+uploaded_pdfs = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
 
 if st.button('Draft Proposal'):
     logger.info("Draft Proposal button clicked")
@@ -193,8 +188,9 @@ if st.button('Draft Proposal'):
         elif not uploaded_pdfs:
             st.error("Please upload at least one PDF file.")
             st.stop()
-        
-        logger.info(f"Number of PDFs uploaded: {len(uploaded_pdfs)}")
+        elif total_budget <= 0:
+            st.error("Please enter a valid total budget.")
+            st.stop()
         
         # Process uploaded PDFs
         pdf_paths = []
@@ -220,24 +216,34 @@ if st.button('Draft Proposal'):
         document_ingestion_task = tasks.document_ingestion_task(document_ingestion_agent, org_name, proposal_background)
         rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
         proposal_writing_task = tasks.proposal_writing_task(proposal_writer_agent, "{{rfp_analysis_task.output}}", org_name)
-        budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}")
+        budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}", total_budget)
         quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}\n{{budget_preparation_task.output}}")
 
-        # Create and run crew
+        # Create crew
         crew = Crew(
             agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
             tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
             verbose=True
         )
 
-        logger.info("Starting CrewAI job...")
-        st.info("Starting CrewAI job...")
-        
-        with st.spinner("CrewAI Job in Progress..."):
-            result = crew.kickoff()
-        
+        # Create a placeholder for live updates
+        output_placeholder = st.empty()
+        stream_handler = StreamToSt(output_placeholder)
+
+        # Redirect stdout to our custom stream handler
+        sys.stdout = stream_handler
+
+        # Run the crew
+        result = crew.kickoff()
+
+        # Reset stdout
+        sys.stdout = sys.__stdout__
+
+        # Flush any remaining content
+        stream_handler.flush()
+
         st.success("CrewAI Job Completed!")
-        
+
         # Process and display results
         st.subheader("Proposal Draft")
         st.write(result)

@@ -11,6 +11,8 @@ This Streamlit application uses AI-powered agents to analyze Request for Proposa
 - Real-time display of AI agent activities and thoughts
 - Generation of organized summaries and proposal drafts
 - Download capability for analysis results
+- Input total budget and generate itemized budget breakdown
+- Real-time display of AI agent activities, thoughts, and outputs
 
 ## 🛠️ Installation
 

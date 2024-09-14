@@ -60,25 +60,13 @@ class CustomTasks:
             expected_output="Complete draft of the grant proposal, addressing all RFP requirements and highlighting the organization's strengths",
         )
 
-    def budget_preparation_task(self, agent, proposal_draft):
+    def budget_preparation_task(self, agent, proposal_content, total_budget):
         return Task(
-            description=dedent(f"""
-                Prepare a detailed budget for the grant proposal.
-                
-                Your task is to:
-                1. Review the proposal draft and identify all budget-related items.
-                2. Create a comprehensive budget that covers all aspects of the proposed project.
-                3. Ensure the budget is realistic, justified, and aligns with the RFP requirements.
-                4. Provide brief explanations for each budget item.
-                5. Include any required matching funds or in-kind contributions.
-                6. Ensure the budget adheres to any specific formatting or category requirements in the RFP.
-                
-                Proposal Draft: {proposal_draft}
-                
-                {self.__tip_section()}
-            """),
-            agent=agent,
-            expected_output="Detailed budget spreadsheet with itemized costs, justifications, and any required explanatory notes",
+            description=f"""Based on the proposal content and the total budget of ${total_budget:,}, create an itemized budget. 
+            Ensure that the sum of all items equals the total budget. 
+            Consider the specific needs and requirements mentioned in the proposal.
+            Proposal content: {proposal_content}""",
+            agent=agent
         )
 
     def quality_review_task(self, agent, full_proposal):

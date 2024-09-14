@@ -164,7 +164,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title('📋 ProposalCraft - AI-Powered RFP/Proposal Generator')
+st.title('📋 ProposalCraft')
 st.markdown('Generate comprehensive proposal drafts using AI analysis of your RFP documents.')
 
 # Background section

@@ -236,6 +236,9 @@ if st.button('Run Custom Crew'):
 
                 st.header("🚀 CrewAI Job in Progress")
                 progress_bar = st.progress(0)
+                start_time = time.time()
+                max_duration = 100  # Maximum expected duration in seconds
+
                 crew_output_container = st.empty()
                 stream_to_st = StreamToSt(crew_output_container)
                 sys.stdout = stream_to_st
@@ -244,7 +247,9 @@ if st.button('Run Custom Crew'):
                 try:
                     with crew_output_container:
                         while not crew_finished:
-                            progress_bar.progress(min(time.time() % 100, 100))
+                            elapsed_time = time.time() - start_time
+                            progress = min(elapsed_time / max_duration, 1.0)
+                            progress_bar.progress(progress)
                             time.sleep(0.1)
                     
                     result = crew.kickoff()

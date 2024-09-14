@@ -168,12 +168,12 @@ st.title('📋 ProposalCraft')
 st.markdown('Generate comprehensive proposal drafts using AI analysis of your RFP documents.')
 
 # Background section
-st.header('🎯 Background')
+st.subheader('🎯 Background')
 org_name = st.text_input('Please enter the name of the organization or company')
 proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted')
 
 # Total Budget section
-st.header('💰 Total Budget')
+st.subheader('💰 Total Budget')
 total_budget = st.number_input('Enter the total budget for the proposal:', min_value=0, step=1000, format="%d")
 
 # File upload section

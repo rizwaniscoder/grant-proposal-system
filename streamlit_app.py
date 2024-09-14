@@ -195,11 +195,11 @@ if st.button('Run Custom Crew'):
 
                 logger.info("Creating Crew")
                 crew = Crew(
-                agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
-                tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
-                process=Process.sequential,
-                manager_llm=get_groq_llm(),
-                verbose=True,  # Change this from 2 to True
+                    agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
+                    tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
+                    process=Process.sequential,
+                    manager_llm=get_groq_llm(),
+                    verbose=True,  # Change this from 2 to True
                 )
 
                 logger.info("Starting Crew kickoff")

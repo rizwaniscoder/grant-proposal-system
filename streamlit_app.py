@@ -116,22 +116,25 @@ def get_binary_file_downloader_html(bin_file, file_label='File'):
     href = f'<a href="data:application/json;base64,{b64}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
     return href
 
-st.set_page_config(page_title='Custom Crew AI', layout="wide")
+# Set page config
+st.set_page_config(page_title='Custom Crew AI', layout="centered")
 
-# Add CSS for animations
+# Custom CSS to control width
 st.markdown("""
-<style>
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-.fadeIn { animation: fadeIn 0.5s ease-in; }
-</style>
+    <style>
+        .reportview-container .main .block-container{
+            max-width: 800px;
+            padding-top: 5rem;
+            padding-right: 1rem;
+            padding-left: 1rem;
+            padding-bottom: 5rem;
+        }
+    </style>
 """, unsafe_allow_html=True)
 
 st.title('📋 RFP / Proposal Draft')
 
-st.markdown("## 🎯 Background")
+st.markdown("## Background")
 org_name = st.text_input('Please enter the name of the organization or company')
 proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
 
@@ -179,18 +182,24 @@ if st.button('Run Custom Crew'):
                 logger.info("Setting up agents")
                 document_ingestion_agent = agents.document_ingestion_agent()
                 rfp_analysis_agent = agents.rfp_analysis_agent()
+                proposal_writer_agent = agents.proposal_writer_agent()
+                budget_specialist_agent = agents.budget_specialist_agent()
+                quality_assurance_agent = agents.quality_assurance_agent()
                 
                 logger.info("Setting up tasks")
                 document_ingestion_task = tasks.document_ingestion_task(document_ingestion_agent, org_name, proposal_background)
                 rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
+                proposal_writing_task = tasks.proposal_writing_task(proposal_writer_agent, "{{rfp_analysis_task.output}}", org_name)
+                budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}")
+                quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}\n{{budget_preparation_task.output}}")
 
                 logger.info("Creating Crew")
                 crew = Crew(
-                    agents=[document_ingestion_agent, rfp_analysis_agent],
-                    tasks=[document_ingestion_task, rfp_analysis_task],
-                    process=Process.sequential,
-                    manager_llm=get_groq_llm(),
-                    verbose=2,
+                agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
+                tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
+                process=Process.sequential,
+                manager_llm=get_groq_llm(),
+                verbose=True,  # Change this from 2 to True
                 )
 
                 logger.info("Starting Crew kickoff")
@@ -205,46 +214,44 @@ if st.button('Run Custom Crew'):
                 stream_to_st = StreamToSt(crew_output_container)
                 sys.stdout = stream_to_st
 
-                crew_finished = False
                 try:
-                    with crew_output_container:
-                        with st.empty():
-                            while not crew_finished:
-                                st.spinner("Crew is still working...")
-                                time.sleep(0.1)
-                    
-                    result = crew.kickoff()
-                    crew_finished = True
-                    
-                    # Convert CrewOutput to a dictionary
-                    result_dict = {
-                        "final_output": result.final_output,
-                        "task_outputs": [
-                            {
-                                "task_name": task.name,
-                                "output": task.output
-                            } for task in result.tasks
-                        ]
-                    }
+                    for task in crew.tasks:
+                        task_result = task.execute()
+                        st.markdown(f"## Task Completed: {task.name}")
+                        st.write(task_result)
+                        if st.button("Continue to next task"):
+                            continue
+                        else:
+                            st.stop()
+                    result = crew.get_final_output()
+                finally:
+                    # Restore the original stdout and flush any remaining output
+                    sys.stdout = original_stdout
+                    stream_to_st.flush()
 
-                    # Display the final result
-                    st.markdown("## 📊 Analysis Result:")
-                    st.json(result_dict)
+                # Display the final result
+                st.markdown("## 📊 Analysis Result:")
+                
+                # Convert CrewOutput to a dictionary
+                result_dict = {
+                    "final_output": result.final_output,
+                    "tasks": [
+                        {
+                            "task_name": task.name,
+                            "output": task.output
+                        } for task in result.tasks
+                    ]
+                }
+                
+                st.json(json.dumps(result_dict, indent=2))
 
-                    # Save the result as JSON
-                    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp_file:
-                        json.dump(result_dict, tmp_file, indent=2)
-                        tmp_file_name = tmp_file.name
+                # Save the result as a JSON file
+                with open("proposal_result.json", "w") as f:
+                    json.dump(result_dict, f, indent=2)
 
-                    st.markdown(get_binary_file_downloader_html(tmp_file_name, 'Crew Result'), unsafe_allow_html=True)
+                # Provide a download link for the JSON file
+                st.markdown(get_binary_file_downloader_html("proposal_result.json", "Download Proposal Result"), unsafe_allow_html=True)
 
-                    os.remove(tmp_file_name)
-
-                except Exception as e:
-                    error_msg = f"An error occurred during crew execution: {str(e)}"
-                    logger.error(error_msg)
-                    st.error(error_msg)
-            
             except Exception as e:
                 error_msg = f"An error occurred during crew execution: {str(e)}"
                 logger.error(error_msg)

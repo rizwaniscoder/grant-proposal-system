@@ -39,4 +39,66 @@ class CustomTasks:
             expected_output="Detailed task outline based on RFP requirements",
         )
 
-    # Other task methods can be added back as needed, following the same pattern
+    def proposal_writing_task(self, agent, rfp_analysis, org_info):
+        return Task(
+            description=dedent(f"""
+                Write a compelling proposal based on the RFP analysis and organization information.
+                
+                Your task is to:
+                1. Use the RFP analysis to address all key requirements.
+                2. Incorporate the organization's background, goals, and unique value proposition.
+                3. Structure the proposal logically and persuasively.
+                4. Ensure the language is clear, concise, and tailored to the grant committee.
+                5. Include relevant statistics, case studies, or success stories to support your points.
+                
+                RFP Analysis: {rfp_analysis}
+                Organization Info: {org_info}
+                
+                {self.__tip_section()}
+            """),
+            agent=agent,
+            expected_output="Complete draft of the grant proposal, addressing all RFP requirements and highlighting the organization's strengths",
+        )
+
+    def budget_preparation_task(self, agent, proposal_draft):
+        return Task(
+            description=dedent(f"""
+                Prepare a detailed budget for the grant proposal.
+                
+                Your task is to:
+                1. Review the proposal draft and identify all budget-related items.
+                2. Create a comprehensive budget that covers all aspects of the proposed project.
+                3. Ensure the budget is realistic, justified, and aligns with the RFP requirements.
+                4. Provide brief explanations for each budget item.
+                5. Include any required matching funds or in-kind contributions.
+                6. Ensure the budget adheres to any specific formatting or category requirements in the RFP.
+                
+                Proposal Draft: {proposal_draft}
+                
+                {self.__tip_section()}
+            """),
+            agent=agent,
+            expected_output="Detailed budget spreadsheet with itemized costs, justifications, and any required explanatory notes",
+        )
+
+    def quality_review_task(self, agent, full_proposal):
+        return Task(
+            description=dedent(f"""
+                Review and improve the complete grant proposal.
+                
+                Your task is to:
+                1. Ensure all RFP requirements are met and clearly addressed.
+                2. Check for consistency in tone, style, and messaging throughout the proposal.
+                3. Verify that the budget aligns with the proposal narrative.
+                4. Suggest improvements for clarity, persuasiveness, and overall quality.
+                5. Proofread for any grammatical or formatting errors.
+                6. Ensure all required attachments or supplementary materials are included and properly referenced.
+                7. Verify that the proposal adheres to any page limits or formatting requirements specified in the RFP.
+                
+                Full Proposal: {full_proposal}
+                
+                {self.__tip_section()}
+            """),
+            agent=agent,
+            expected_output="Comprehensive review report with specific suggestions for improvements, corrections, and final polish of the grant proposal",
+        )

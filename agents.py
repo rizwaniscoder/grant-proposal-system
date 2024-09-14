@@ -1,51 +1,20 @@
 from crewai import Agent
-from textwrap import dedent
-from langchain_groq import ChatGroq
-import os
 from langchain.tools import Tool
-from langchain.text_splitter import CharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain_community.document_loaders import PyPDFLoader
+from langchain.llms import Groq
 
 class CustomAgents:
     def __init__(self, pdf_paths):
         self.pdf_paths = pdf_paths
-        self.groq_llm = None
-        self.pdf_tools = {}
-        self.embeddings = None
 
     def get_groq_llm(self):
-        if self.groq_llm is None:
-            self.groq_llm = ChatGroq(
-                temperature=0,
-                model_name="llama3-70b-8192",
-                api_key=os.getenv("GROQ_API_KEY")
-            )
-        return self.groq_llm
-
-    def get_embeddings(self):
-        if self.embeddings is None:
-            self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        return self.embeddings
-
-    def create_pdf_search_tool(self, pdf_path):
-        if pdf_path not in self.pdf_tools:
-            loader = PyPDFLoader(pdf_path)
-            documents = loader.load()
-            text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-            texts = text_splitter.split_documents(documents)
-            db = FAISS.from_documents(texts, self.get_embeddings())
-
-            self.pdf_tools[pdf_path] = Tool(
-                name=f"Search {pdf_path}",
-                func=lambda q, db=db: db.similarity_search(q, k=1)[0].page_content,
-                description=f"Useful for searching content in {pdf_path}"
-            )
-        return self.pdf_tools[pdf_path]
+        return Groq(temperature=0.7, model_name="llama3-70b-8192")
 
     def get_pdf_tools(self):
         return [self.create_pdf_search_tool(path) for path in self.pdf_paths]
+
+    def create_pdf_search_tool(self, pdf_path):
+        # Implement PDF search functionality
+        pass
 
     def document_ingestion_agent(self):
         return Agent(
@@ -69,4 +38,32 @@ class CustomAgents:
             llm=self.get_groq_llm(),
         )
 
-    # Other agent methods can be added back as needed, following the same pattern
+    def proposal_writer_agent(self):
+        return Agent(
+            role="Expert Proposal Writer",
+            backstory="You are a highly skilled proposal writer with years of experience in crafting winning proposals for nonprofits.",
+            goal="Create compelling and tailored proposal content based on the RFP analysis and organization's goals.",
+            allow_delegation=True,
+            verbose=True,
+            llm=self.get_groq_llm(),
+        )
+
+    def budget_specialist_agent(self):
+        return Agent(
+            role="Nonprofit Budget Specialist",
+            backstory="You are an expert in creating detailed and realistic budgets for nonprofit organizations and grant proposals.",
+            goal="Develop a comprehensive budget that aligns with the proposal and meets all RFP requirements.",
+            allow_delegation=True,
+            verbose=True,
+            llm=self.get_groq_llm(),
+        )
+
+    def quality_assurance_agent(self):
+        return Agent(
+            role="Proposal Quality Assurance Specialist",
+            backstory="You have a keen eye for detail and extensive experience in reviewing and improving grant proposals.",
+            goal="Ensure the final proposal is of the highest quality, meets all RFP requirements, and is compelling to the grant committee.",
+            allow_delegation=True,
+            verbose=True,
+            llm=self.get_groq_llm(),
+        )

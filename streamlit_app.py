@@ -184,7 +184,7 @@ Upload PDF files (max 200MB each) that contain:
 - Details about the core elements of your proposal
 - Any relevant RFP (Request for Proposal) documents
 
-The more comprehensive and relevant the uploaded documents, the better the AI-generated proposal will be.
+The more comprehensive and relevant the uploaded documents the better the AI-generated proposal.
 """)
 
 # File uploader widget

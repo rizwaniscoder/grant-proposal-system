@@ -59,7 +59,7 @@ class StreamToSt:
             self.flush_content()
             self.current_section = line.split(':')[0]
             formatted = self.format_output(line)
-            self.st_component.markdown(f'<div class="fadeIn" style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px;">{formatted}</div>', unsafe_allow_html=True)
+            self.st_component.markdown(formatted)
         elif self.current_section:
             self.content_buffer.append(line.strip())
 
@@ -79,16 +79,16 @@ class StreamToSt:
 
     def format_output(self, content):
         if "Thought:" in content:
-            return f'<div style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;"> <strong style="color: #2c3e50;">Thought:</strong></div> {content.split("Thought:")[1].strip()}'
+            return f'<div style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;">🤔 <strong style="color: #2c3e50;">Thought:</strong></div>\n\n{content.split("Thought:")[1].strip()}'
         elif "Action:" in content:
-            return f'<div style="background-color: #e6f3ff; padding: 5px; border-radius: 3px;"> <strong style="color: #3498db;">Action:</strong></div> {content.split("Action:")[1].strip()}'
+            return f'<div style="background-color: #e6f3ff; padding: 5px; border-radius: 3px;">🛠️ <strong style="color: #3498db;">Action:</strong></div>\n\n{content.split("Action:")[1].strip()}'
         elif "Action Input:" in content:
-            return f'<div style="background-color: #fff5e6; padding: 5px; border-radius: 3px;"> <strong style="color: #e67e22;">Action Input:</strong></div> {content.split("Action Input:")[1].strip()}'
+            return f'<div style="background-color: #fff5e6; padding: 5px; border-radius: 3px;">📥 <strong style="color: #e67e22;">Action Input:</strong></div>\n\n{content.split("Action Input:")[1].strip()}'
         elif "Observation:" in content:
-            return f'<div style="background-color: #e6ffe6; padding: 5px; border-radius: 3px;"> <strong style="color: #27ae60;">Observation:</strong></div> {content.split("Observation:")[1].strip()}'
+            return f'<div style="background-color: #e6ffe6; padding: 5px; border-radius: 3px;">👁️ <strong style="color: #27ae60;">Observation:</strong></div>\n\n{content.split("Observation:")[1].strip()}'
         elif "Final Answer:" in content:
             answer = content.split("Final Answer:")[1].strip()
-            return f'<div style="background-color: #ffe6e6; padding: 5px; border-radius: 3px;"> <strong style="color: #e74c3c;">Final Answer:</strong></div>\n\n{answer}'
+            return f'<div style="background-color: #ffe6e6; padding: 5px; border-radius: 3px;">🎯 <strong style="color: #e74c3c;">Final Answer:</strong></div>\n\n{answer}'
         else:
             return content.strip()
 
@@ -114,7 +114,7 @@ def get_groq_llm():
             callback_manager = None
         
         return ChatGroq(
-            temperature=0.5,  # Lower temperature
+            temperature=0.2,  # Lower temperature
             model_name="llama3-70b-8192",
             api_key=os.getenv("GROQ_API_KEY"),
             callback_manager=callback_manager
@@ -140,26 +140,28 @@ def preprocess_output(text):
 # Set page config
 st.set_page_config(page_title='Custom Crew AI', layout="centered")
 
-# Custom CSS to control width
+# Add CSS for animations and set max-width
 st.markdown("""
-    <style>
-        .reportview-container .main .block-container{
-            max-width: 800px;
-            padding-top: 5rem;
-            padding-right: 1rem;
-            padding-left: 1rem;
-            padding-bottom: 5rem;
-        }
-    </style>
+<style>
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.fadeIn { animation: fadeIn 0.5s ease-in; }
+.stApp {
+    max-width: 800px;
+    margin: 0 auto;
+}
+</style>
 """, unsafe_allow_html=True)
 
-st.title(' RFP / Proposal Draft')
+st.title('📋 RFP / Proposal Draft')
 
-st.markdown("## Background")
+st.markdown("## 🎯 Background")
 org_name = st.text_input('Please enter the name of the organization or company')
 proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
 
-st.markdown("## Uploaded Files")
+st.markdown("## 📁 Uploaded Files")
 uploaded_pdfs = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
 
 # Process the uploaded files without displaying them again
@@ -231,36 +233,38 @@ if st.button('Run Custom Crew'):
 
                 logger.info("Starting Crew kickoff")
                 
-                status_placeholder = st.empty()
-                progress_bar = st.progress(0)
-                log_placeholder = st.empty()
+                crew_output_container = st.empty()
+                stream_to_st = StreamToSt(crew_output_container)
+                sys.stdout = stream_to_st
 
-                def update_status():
-                    for i in range(100):
-                        status_placeholder.text(f"Status: Crew is working on your proposal... {i+1}%")
-                        progress_bar.progress(i + 1)
-                        time.sleep(0.5)  # Increase sleep time for a slower, more visible progress
+                crew_finished = False
+                try:
+                    with crew_output_container:
+                        with st.empty():
+                            while not crew_finished:
+                                st.spinner("Crew is still working...")
+                                time.sleep(0.1)
+                    
+                    result = crew.kickoff()
+                    crew_finished = True
+                    
+                    # Convert CrewOutput to a dictionary
+                    result_dict = {
+                        # Add result processing here
+                    }
 
-                old_stdout = sys.stdout
-                sys.stdout = StringIO()
-
-                thread = threading.Thread(target=crew.kickoff)
-                thread.start()
-
-                update_status()
-
-                thread.join()
-
-                output = sys.stdout.getvalue()
-                sys.stdout = old_stdout
-
-                status_placeholder.empty()
-                progress_bar.empty()
-
-                log_placeholder.markdown(f"<pre>{output}</pre>", unsafe_allow_html=True)
-
-                st.write("Crew work completed!")
-                st.write(crew.result)
+                except Exception as e:
+                    error_msg = f"An error occurred during crew setup: {str(e)}"
+                    logger.error(error_msg)
+                    st.error(error_msg)
+                
+                finally:
+                    for path in pdf_paths:
+                        try:
+                            os.remove(path)
+                            logger.info(f"Removed temporary file: {path}")
+                        except Exception as e:
+                            logger.error(f"Error removing temporary file {path}: {str(e)}")
             except Exception as e:
                 error_msg = f"An error occurred during crew setup: {str(e)}"
                 logger.error(error_msg)

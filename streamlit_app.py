@@ -59,7 +59,7 @@ class StreamToSt:
             self.flush_content()
             self.current_section = line.split(':')[0]
             formatted = self.format_output(line)
-            self.st_component.markdown(formatted)
+            self.st_component.markdown(f'<div class="fadeIn" style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px;">{formatted}</div>', unsafe_allow_html=True)
         elif self.current_section:
             self.content_buffer.append(line.strip())
 
@@ -79,13 +79,13 @@ class StreamToSt:
 
     def format_output(self, content):
         if "Thought:" in content:
-            return f'<div style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;">🤔 <strong style="color: #2c3e50;">Thought:</strong></div>\n\n{content.split("Thought:")[1].strip()}'
+            return f'<div style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;">🤔 <strong style="color: #2c3e50;">Thought:</strong></div> {content.split("Thought:")[1].strip()}'
         elif "Action:" in content:
-            return f'<div style="background-color: #e6f3ff; padding: 5px; border-radius: 3px;">🛠️ <strong style="color: #3498db;">Action:</strong></div>\n\n{content.split("Action:")[1].strip()}'
+            return f'<div style="background-color: #e6f3ff; padding: 5px; border-radius: 3px;">🛠️ <strong style="color: #3498db;">Action:</strong></div> {content.split("Action:")[1].strip()}'
         elif "Action Input:" in content:
-            return f'<div style="background-color: #fff5e6; padding: 5px; border-radius: 3px;">📥 <strong style="color: #e67e22;">Action Input:</strong></div>\n\n{content.split("Action Input:")[1].strip()}'
+            return f'<div style="background-color: #fff5e6; padding: 5px; border-radius: 3px;">📥 <strong style="color: #e67e22;">Action Input:</strong></div> {content.split("Action Input:")[1].strip()}'
         elif "Observation:" in content:
-            return f'<div style="background-color: #e6ffe6; padding: 5px; border-radius: 3px;">👁️ <strong style="color: #27ae60;">Observation:</strong></div>\n\n{content.split("Observation:")[1].strip()}'
+            return f'<div style="background-color: #e6ffe6; padding: 5px; border-radius: 3px;">👁️ <strong style="color: #27ae60;">Observation:</strong></div> {content.split("Observation:")[1].strip()}'
         elif "Final Answer:" in content:
             answer = content.split("Final Answer:")[1].strip()
             return f'<div style="background-color: #ffe6e6; padding: 5px; border-radius: 3px;">🎯 <strong style="color: #e74c3c;">Final Answer:</strong></div>\n\n{answer}'

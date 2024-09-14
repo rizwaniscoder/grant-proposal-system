@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # LangSmith configuration
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
-os.environ["LANGCHAIN_API_KEY"] = "your_langsmith_api_key"
+os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
 
 try:
     from langsmith import Client
@@ -183,9 +183,10 @@ if uploaded_pdfs:
         pass
 
 if st.button('Draft Proposal'):
-    logger.info("Run Custom Crew button clicked")
+    logger.info("Draft Proposal button clicked")
     
     try:
+        # Input validation
         if not org_name or not proposal_background:
             st.error("Please enter both the organization name and background information on the RFP / proposal.")
             st.stop()
@@ -195,136 +196,74 @@ if st.button('Draft Proposal'):
         
         logger.info(f"Number of PDFs uploaded: {len(uploaded_pdfs)}")
         
+        # Process uploaded PDFs
         pdf_paths = []
-        try:
-            for uploaded_pdf in uploaded_pdfs:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                    tmp_file.write(uploaded_pdf.getvalue())
-                    pdf_paths.append(tmp_file.name)
-                logger.info(f"Processed: {uploaded_pdf.name}")
-        except Exception as e:
-            st.error(f"Error processing uploaded files: {str(e)}")
-            st.stop()
-        finally:
-            for path in pdf_paths:
-                try:
-                    os.remove(path)
-                    logger.info(f"Removed temporary file: {path}")
-                except Exception as e:
-                    logger.error(f"Error removing temporary file {path}: {str(e)}")
+        for uploaded_pdf in uploaded_pdfs:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                tmp_file.write(uploaded_pdf.getvalue())
+                pdf_paths.append(tmp_file.name)
+            logger.info(f"Processed: {uploaded_pdf.name}")
         
         logger.info(f"Total PDFs processed: {len(pdf_paths)}")
+
+        # Initialize agents and tasks
+        agents = CustomAgents(pdf_paths)
+        tasks = CustomTasks()
         
-        if pdf_paths:
-            try:
-                logger.info("Initializing CustomAgents")
-                agents = CustomAgents(pdf_paths)
-                logger.info("Initializing CustomTasks")
-                tasks = CustomTasks()
-                
-                logger.info("Setting up agents")
-                document_ingestion_agent = agents.document_ingestion_agent()
-                rfp_analysis_agent = agents.rfp_analysis_agent()
-                proposal_writer_agent = agents.proposal_writer_agent()
-                budget_specialist_agent = agents.budget_specialist_agent()
-                quality_assurance_agent = agents.quality_assurance_agent()
-                
-                logger.info("Setting up tasks")
-                document_ingestion_task = tasks.document_ingestion_task(document_ingestion_agent, org_name, proposal_background)
-                rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
-                proposal_writing_task = tasks.proposal_writing_task(proposal_writer_agent, "{{rfp_analysis_task.output}}", org_name)
-                budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}")
-                quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}\n{{budget_preparation_task.output}}")
+        # Set up agents and tasks
+        document_ingestion_agent = agents.document_ingestion_agent()
+        rfp_analysis_agent = agents.rfp_analysis_agent()
+        proposal_writer_agent = agents.proposal_writer_agent()
+        budget_specialist_agent = agents.budget_specialist_agent()
+        quality_assurance_agent = agents.quality_assurance_agent()
+        
+        document_ingestion_task = tasks.document_ingestion_task(document_ingestion_agent, org_name, proposal_background)
+        rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
+        proposal_writing_task = tasks.proposal_writing_task(proposal_writer_agent, "{{rfp_analysis_task.output}}", org_name)
+        budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}")
+        quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}\n{{budget_preparation_task.output}}")
 
-                logger.info("Creating Crew")
-                crew = Crew(
-                    agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
-                    tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
-                    verbose=True
-                )
+        # Create and run crew
+        crew = Crew(
+            agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
+            tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
+            verbose=True
+        )
 
-                logger.info("About to start crew kickoff")
-                st.info("Starting CrewAI job...")
-                st.header("🚀 CrewAI Job in Progress")
-                progress_bar = st.progress(0)
-                start_time = time.time()
-                max_duration = 100  # Maximum expected duration in seconds
-
-                crew_output_container = st.empty()
-                stream_to_st = StreamToSt(crew_output_container)
-                sys.stdout = stream_to_st
-
-                crew_finished = False
-                try:
-                    with crew_output_container:
-                        while not crew_finished:
-                            elapsed_time = time.time() - start_time
-                            progress = min(elapsed_time / max_duration, 1.0)
-                            progress_bar.progress(progress)
-                            time.sleep(0.1)
-                    
-                    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(5))
-                    def execute_with_retry(func, *args, **kwargs):
-                        try:
-                            return func(*args, **kwargs)
-                        except RateLimitError as e:
-                            logger.warning(f"Rate limit hit, retrying: {str(e)}")
-                            raise
-
-                    result = execute_with_retry(crew.kickoff)
-                    crew_finished = True
-                    progress_bar.progress(100)
-                    st.success("CrewAI Job Completed!")
-
-                    # Convert CrewOutput to a dictionary
-                    result_dict = {
-                        # Add result processing here
-                    }
-
-                except Exception as e:
-                    error_msg = f"An error occurred during crew execution: {str(e)}"
-                    logger.error(error_msg)
-                    st.error(error_msg)
-                    # Log the full traceback for debugging
-                    import traceback
-                    logger.error(traceback.format_exc())
-                
-                finally:
-                    for path in pdf_paths:
-                        try:
-                            os.remove(path)
-                            logger.info(f"Removed temporary file: {path}")
-                        except Exception as e:
-                            logger.error(f"Error removing temporary file {path}: {str(e)}")
-            except Exception as e:
-                error_msg = f"An error occurred during crew setup: {str(e)}"
-                logger.error(error_msg)
-                st.error(error_msg)
-            
-            finally:
-                for path in pdf_paths:
-                    try:
-                        os.remove(path)
-                        logger.info(f"Removed temporary file: {path}")
-                    except Exception as e:
-                        logger.error(f"Error removing temporary file {path}: {str(e)}")
-        else:
-            st.error("No PDF files were successfully processed. Please try uploading them again.")
-
+        logger.info("Starting CrewAI job...")
+        st.info("Starting CrewAI job...")
+        
+        with st.spinner("CrewAI Job in Progress..."):
+            result = crew.kickoff()
+        
+        st.success("CrewAI Job Completed!")
+        
+        # Process and display results
+        st.subheader("Proposal Draft")
+        st.write(result)
+        
     except Exception as e:
-        error_msg = f"An unexpected error occurred: {str(e)}"
+        error_msg = f"An error occurred: {str(e)}"
         logger.error(error_msg)
         st.error(error_msg)
+        logger.error(traceback.format_exc())
+    
     finally:
+        # Clean up temporary files
+        for path in pdf_paths:
+            try:
+                os.remove(path)
+                logger.info(f"Removed temporary file: {path}")
+            except Exception as e:
+                logger.error(f"Error removing temporary file {path}: {str(e)}")
+        
         log_memory_usage()
 
+# Graceful shutdown
 try:
-    # Your Streamlit app code here
-    st.title('CrewAI Job')
+    st.title('ProposalCraft')
     # ... rest of your app ...
-
 except KeyboardInterrupt:
     st.write("Shutting down gracefully...")
-    # Perform any necessary cleanup here
 finally:
     st.stop()

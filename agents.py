@@ -58,8 +58,11 @@ class CustomAgents:
         )
 
     def get_groq_llm(self):
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY environment variable is not set")
         return Groq(
             temperature=0.7,
             model_name="llama3-70b-8192",
-            api_key=os.getenv("GROQ_API_KEY")
+            api_key=api_key
         )

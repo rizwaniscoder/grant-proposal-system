@@ -17,6 +17,7 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 from io import StringIO
 import threading
 from tenacity import retry, stop_after_attempt, wait_random_exponential
+import traceback
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

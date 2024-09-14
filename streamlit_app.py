@@ -242,7 +242,7 @@ if st.button('Draft Proposal'):
         rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
         proposal_writing_task = tasks.proposal_writing_task(proposal_writer_agent, "{{rfp_analysis_task.output}}", org_name)
         budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}", total_budget)
-        quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}\n{{budget_preparation_task.output}}")
+        quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}", "{{budget_preparation_task.output}}")
 
         # Create crew
         crew = Crew(
@@ -300,11 +300,14 @@ if st.button('Draft Proposal'):
         
         log_memory_usage()
 
-# Graceful shutdown
-try:
-    # Your main app code goes here
-    pass
-except KeyboardInterrupt:
-    st.write("Shutting down gracefully...")
-finally:
-    st.stop()
+# Main execution
+if __name__ == "__main__":
+    try:
+        # Your main app code goes here
+        st.title('📋 ProposalCraft')
+        st.markdown('Generate comprehensive proposal drafts using AI analysis of your RFP documents.')
+        # ... (rest of your main app code)
+    except KeyboardInterrupt:
+        st.write("Shutting down gracefully...")
+    finally:
+        st.stop()

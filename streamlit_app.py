@@ -45,11 +45,12 @@ class StreamToSt:
     def write(self, content):
         if isinstance(content, str):
             self.buffer += content
-            if '\n' in self.buffer:
+            if '\n' in self.buffer or len(self.buffer) > 1000:
                 lines = self.buffer.split('\n')
                 for line in lines[:-1]:
                     self.process_line(line)
                 self.buffer = lines[-1]
+                self.flush_content()
         else:
             # Handle non-string content
             self.st_component.write(content)
@@ -232,7 +233,9 @@ if st.button('Run Custom Crew'):
                 )
 
                 logger.info("Starting Crew kickoff")
-                
+
+                st.header("🚀 CrewAI Job in Progress")
+                progress_bar = st.progress(0)
                 crew_output_container = st.empty()
                 stream_to_st = StreamToSt(crew_output_container)
                 sys.stdout = stream_to_st
@@ -240,14 +243,15 @@ if st.button('Run Custom Crew'):
                 crew_finished = False
                 try:
                     with crew_output_container:
-                        with st.empty():
-                            while not crew_finished:
-                                st.spinner("Crew is still working...")
-                                time.sleep(0.1)
+                        while not crew_finished:
+                            progress_bar.progress(min(time.time() % 100, 100))
+                            time.sleep(0.1)
                     
                     result = crew.kickoff()
                     crew_finished = True
-                    
+                    progress_bar.progress(100)
+                    st.success("CrewAI Job Completed!")
+
                     # Convert CrewOutput to a dictionary
                     result_dict = {
                         # Add result processing here

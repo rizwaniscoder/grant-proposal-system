@@ -55,7 +55,8 @@ class StreamToSt:
                 self.flush_content()
         else:
             # Handle non-string content
-            self.st_component.write(content)
+            self.st_component.write(str(content))
+        self.flush_content()
 
     def process_line(self, line):
         if any(keyword in line for keyword in ["Thought:", "Action:", "Action Input:", "Observation:", "Final Answer:"]):
@@ -162,35 +163,60 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title('📋 ProposalCraft')
+st.title('📋 ProposalCraft - AI-Powered RFP/Proposal Generator')
+st.markdown('Generate comprehensive proposal drafts using AI analysis of your RFP documents.')
 
-st.markdown("## 🎯 Background")
+# Background section
+st.header('🎯 Background')
 org_name = st.text_input('Please enter the name of the organization or company')
-proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted', height=300)
+proposal_background = st.text_area('Please provide background on the RFP / proposal that needs to be drafted')
 
-st.markdown("## 💰 Total Budget")
-total_budget = st.number_input("Enter the total budget for the proposal:", min_value=0, step=1000, format="%d")
-if total_budget <= 0:
-    st.error("Please enter a valid total budget.")
-    st.stop()
+# Total Budget section
+st.header('💰 Total Budget')
+total_budget = st.number_input('Enter the total budget for the proposal:', min_value=0, step=1000, format="%d")
 
-st.markdown("## 📁 Uploaded Files")
-uploaded_pdfs = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
+# File upload section
+st.subheader("📁 Upload Relevant Documents")
+st.markdown("""
+Upload PDF files (max 200MB each) that contain:
+- Background information about your organization/company
+- Details about the core elements of your proposal
+- Any relevant RFP (Request for Proposal) documents
+
+The more comprehensive and relevant the uploaded documents, the better the AI-generated proposal will be.
+""")
+
+# File uploader widget
+uploaded_pdfs = st.file_uploader("Drag and drop files here", type="pdf", accept_multiple_files=True)
+
+if uploaded_pdfs:
+    st.write(f"Uploaded {len(uploaded_pdfs)} file(s):")
+    for pdf in uploaded_pdfs:
+        st.write(f"- {pdf.name}")
 
 if st.button('Draft Proposal'):
     logger.info("Draft Proposal button clicked")
     
+    # Input validation
+    validation_error = False
+    
+    if not org_name or not proposal_background:
+        st.error("Please enter both the organization name and background information on the RFP / proposal.")
+        validation_error = True
+    
+    if not uploaded_pdfs:
+        st.error("Please upload at least one PDF file.")
+        validation_error = True
+    
+    if total_budget == 0:
+        st.error("Please enter a valid total budget.")
+        validation_error = True
+    
+    if validation_error:
+        st.stop()
+    
     try:
-        # Input validation
-        if not org_name or not proposal_background:
-            st.error("Please enter both the organization name and background information on the RFP / proposal.")
-            st.stop()
-        elif not uploaded_pdfs:
-            st.error("Please upload at least one PDF file.")
-            st.stop()
-        elif total_budget <= 0:
-            st.error("Please enter a valid total budget.")
-            st.stop()
+        logger.info(f"Number of PDFs uploaded: {len(uploaded_pdfs)}")
         
         # Process uploaded PDFs
         pdf_paths = []
@@ -226,6 +252,8 @@ if st.button('Draft Proposal'):
             verbose=True
         )
 
+        st.info("Starting the crew. This process may take several minutes depending on the complexity of your documents and requirements. Please wait while our AI agents analyze and generate your proposal draft.")
+        
         # Create a placeholder for live updates
         output_placeholder = st.empty()
         stream_handler = StreamToSt(output_placeholder)
@@ -234,25 +262,33 @@ if st.button('Draft Proposal'):
         sys.stdout = stream_handler
 
         # Run the crew
-        result = crew.kickoff()
+        with st.spinner("CrewAI Job in Progress..."):
+            result = crew.kickoff()
 
         # Reset stdout
         sys.stdout = sys.__stdout__
 
         # Flush any remaining content
         stream_handler.flush()
-
+        
         st.success("CrewAI Job Completed!")
-
+        
         # Process and display results
-        st.subheader("Proposal Draft")
-        st.write(result)
+        st.subheader("📄 Final Proposal Draft")
+        st.markdown(result)
+        st.download_button(
+            label="Download Proposal Draft",
+            data=result,
+            file_name="proposal_draft.md",
+            mime="text/markdown"
+        )
         
     except Exception as e:
         error_msg = f"An error occurred: {str(e)}"
         logger.error(error_msg)
         st.error(error_msg)
         logger.error(traceback.format_exc())
+        st.error("Please check the logs for more details and try again.")
     
     finally:
         # Clean up temporary files

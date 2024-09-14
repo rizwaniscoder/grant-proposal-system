@@ -14,6 +14,8 @@ import time
 from groq import RateLimitError
 import re
 from streamlit.runtime.scriptrunner import add_script_run_ctx
+from io import StringIO
+import threading
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -159,8 +161,12 @@ proposal_background = st.text_area('Please provide background on the RFP / propo
 
 st.markdown("## Uploaded Files")
 uploaded_pdfs = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
-for pdf in uploaded_pdfs:
-    st.write(f" {pdf.name} ({pdf.size / 1024:.1f}KB)")
+
+# Process the uploaded files without displaying them again
+if uploaded_pdfs:
+    for pdf in uploaded_pdfs:
+        # Process the PDF file here
+        pass
 
 if st.button('Run Custom Crew'):
     logger.info("Run Custom Crew button clicked")
@@ -179,6 +185,9 @@ if st.button('Run Custom Crew'):
                     tmp_file.write(uploaded_pdf.getvalue())
                     pdf_paths.append(tmp_file.name)
                 logger.info(f"Processed: {uploaded_pdf.name}")
+        except Exception as e:
+            st.error(f"Error processing uploaded files: {str(e)}")
+            return
         finally:
             for path in pdf_paths:
                 try:
@@ -219,40 +228,36 @@ if st.button('Run Custom Crew'):
 
                 logger.info("Starting Crew kickoff")
                 
-                st.markdown("## 🔄 Status: Crew is working on your proposal...")
+                status_placeholder = st.empty()
                 progress_bar = st.progress(0)
-                crew_output_container = st.empty()
+                log_placeholder = st.empty()
 
-                def update_progress(progress):
-                    progress_bar.progress(progress)
+                def update_status():
+                    for i in range(100):
+                        status_placeholder.text(f"Status: Crew is working on your proposal... {i+1}%")
+                        progress_bar.progress(i + 1)
+                        time.sleep(0.5)  # Increase sleep time for a slower, more visible progress
 
-                # Wrap the crew.kickoff() call with the progress bar update
-                add_script_run_ctx(update_progress)
+                old_stdout = sys.stdout
+                sys.stdout = StringIO()
 
-                try:
-                    max_retries = 3
-                    retry_delay = 60  # seconds
-                    for attempt in range(max_retries):
-                        try:
-                            result = crew.kickoff()
-                            crew_output_container.markdown(result.final_output)
-                            break
-                        except RateLimitError:
-                            if attempt < max_retries - 1:
-                                st.warning(f"Rate limit reached. Waiting {retry_delay} seconds before retrying...")
-                                time.sleep(retry_delay)
-                            else:
-                                st.error("Max retries reached due to rate limits. Please try again later.")
-                                st.stop()  # Use st.stop() instead of return
-                except Exception as e:
-                    st.error(f"An error occurred during crew execution: {str(e)}")
-                    logger.error(f"Crew execution error: {str(e)}")
+                thread = threading.Thread(target=crew.kickoff)
+                thread.start()
 
-                st.markdown("## Analysis Result:")
-                st.json(json.dumps({
-                    "final_output": result.final_output,
-                    "tasks": [{"task_name": task.name, "output": task.output} for task in result.tasks]
-                }, indent=2))
+                update_status()
+
+                thread.join()
+
+                output = sys.stdout.getvalue()
+                sys.stdout = old_stdout
+
+                status_placeholder.empty()
+                progress_bar.empty()
+
+                log_placeholder.markdown(f"<pre>{output}</pre>", unsafe_allow_html=True)
+
+                st.write("Crew work completed!")
+                st.write(crew.result)
             except Exception as e:
                 error_msg = f"An error occurred during crew setup: {str(e)}"
                 logger.error(error_msg)

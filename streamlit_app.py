@@ -38,6 +38,8 @@ except Exception as e:
     logger.error(f"Error initializing LangSmith client: {str(e)}")
     client = None
 
+pdf_paths = []
+
 class StreamToSt:
     def __init__(self, st_component):
         self.st_component = st_component
@@ -76,6 +78,11 @@ class StreamToSt:
             except Exception as e:
                 st.error(f"Error displaying content: {str(e)}")
             self.content_buffer = []
+        if self.current_section:
+            try:
+                self.st_component.markdown("</div>", unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error closing section: {str(e)}")
 
     def format_output(self, content):
         if "Thought:" in content:
@@ -193,6 +200,20 @@ if st.button('Draft Proposal'):
     try:
         st.info("Starting the crew. This process may take several minutes depending on the complexity of your documents and requirements. Please wait while our AI agents analyze and generate your proposal draft.")
         
+        # Process uploaded PDFs
+        pdf_paths = []
+        for uploaded_pdf in uploaded_pdfs:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                tmp_file.write(uploaded_pdf.getvalue())
+                pdf_paths.append(tmp_file.name)
+            logger.info(f"Processed: {uploaded_pdf.name}")
+        logger.info(f"Total PDFs processed: {len(pdf_paths)}")
+        
+        # Create a placeholder for live updates
+        crew_output_container = st.empty()
+        stream_to_st = StreamToSt(crew_output_container)
+        sys.stdout = stream_to_st
+
         # Initialize agents and tasks
         agents = CustomAgents(pdf_paths)
         tasks = CustomTasks()
@@ -216,20 +237,6 @@ if st.button('Draft Proposal'):
             tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
             verbose=True
         )
-        
-        # Process uploaded PDFs
-        pdf_paths = []
-        for uploaded_pdf in uploaded_pdfs:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                tmp_file.write(uploaded_pdf.getvalue())
-                pdf_paths.append(tmp_file.name)
-            logger.info(f"Processed: {uploaded_pdf.name}")
-        logger.info(f"Total PDFs processed: {len(pdf_paths)}")
-        
-        # Create a placeholder for live updates
-        crew_output_container = st.empty()
-        stream_to_st = StreamToSt(crew_output_container)
-        sys.stdout = stream_to_st
 
         # Run the crew
         with st.spinner("CrewAI Job in Progress..."):

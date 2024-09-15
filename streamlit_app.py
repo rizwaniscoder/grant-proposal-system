@@ -164,6 +164,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Add the title and description at the top of the app
+st.title('📋 ProposalCraft')
+st.markdown('Generate comprehensive proposal drafts using AI analysis of your RFP documents.')
+
 # Background section
 st.subheader('🎯 Background')
 org_name = st.text_input('Please enter the name of the organization or company')

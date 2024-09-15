@@ -60,6 +60,7 @@ class CustomAgents:
             
             Use **bold** for emphasis, and *italics* for secondary emphasis.
             Use bullet points or numbered lists where appropriate.
+            Ensure each section is clearly formatted and easy to read.
             """
         )
 

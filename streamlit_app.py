@@ -145,12 +145,7 @@ uploaded_pdfs = st.file_uploader("Drag and drop files here", type="pdf", accept_
 if uploaded_pdfs:
     st.success(f"Successfully uploaded {len(uploaded_pdfs)} file(s).")
 
-with st.form("input_form"):
-    org_name = st.text_input("Organization Name")
-    proposal_background = st.text_area("Proposal Background")
-    submitted = st.form_submit_button("Draft Proposal")
-
-if submitted:
+if st.button('Draft Proposal'):
     try:
         st.info("Starting the crew. This process may take several minutes depending on the complexity of your documents and requirements. Please wait while our AI agents analyze and generate your proposal draft.")
         
@@ -192,15 +187,12 @@ if submitted:
         crew = Crew(
             agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
             tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
-            verbose=True  # Change this from 2 to True
+            verbose=True
         )
 
         # Run the crew
         with st.spinner("CrewAI Job in Progress..."):
-            try:
-                result = crew.kickoff()
-            except Exception as e:
-                st.error(f"An error occurred during the CrewAI process: {str(e)}")
+            result = crew.kickoff()
 
         # Reset stdout
         sys.stdout = original_stdout

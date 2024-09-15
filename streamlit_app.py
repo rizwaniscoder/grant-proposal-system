@@ -193,6 +193,39 @@ if st.button('Draft Proposal'):
     try:
         st.info("Starting the crew. This process may take several minutes depending on the complexity of your documents and requirements. Please wait while our AI agents analyze and generate your proposal draft.")
         
+        # Initialize agents and tasks
+        agents = CustomAgents(pdf_paths)
+        tasks = CustomTasks()
+
+        # Set up agents and tasks
+        document_ingestion_agent = agents.document_ingestion_agent()
+        rfp_analysis_agent = agents.rfp_analysis_agent()
+        proposal_writer_agent = agents.proposal_writer_agent()
+        budget_specialist_agent = agents.budget_specialist_agent()
+        quality_assurance_agent = agents.quality_assurance_agent()
+
+        document_ingestion_task = tasks.document_ingestion_task(document_ingestion_agent, org_name, proposal_background)
+        rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
+        proposal_writing_task = tasks.proposal_writing_task(proposal_writer_agent, "{{rfp_analysis_task.output}}", org_name)
+        budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}", total_budget)
+        quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}", "{{budget_preparation_task.output}}")
+
+        # Create crew
+        crew = Crew(
+            agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
+            tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
+            verbose=True
+        )
+        
+        # Process uploaded PDFs
+        pdf_paths = []
+        for uploaded_pdf in uploaded_pdfs:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                tmp_file.write(uploaded_pdf.getvalue())
+                pdf_paths.append(tmp_file.name)
+            logger.info(f"Processed: {uploaded_pdf.name}")
+        logger.info(f"Total PDFs processed: {len(pdf_paths)}")
+        
         # Create a placeholder for live updates
         crew_output_container = st.empty()
         stream_to_st = StreamToSt(crew_output_container)

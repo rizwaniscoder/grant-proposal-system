@@ -40,71 +40,20 @@ except Exception as e:
 
 pdf_paths = []
 
-class StreamToSt:
-    def __init__(self, st_component):
-        self.st_component = st_component
+class StreamToExpander:
+    def __init__(self, expander, buffer_limit=10000):
+        self.expander = expander
         self.buffer = ""
-        self.current_section = None
-        self.content_buffer = []
+        self.buffer_limit = buffer_limit
 
     def write(self, content):
-        if isinstance(content, str):
-            self.buffer += content
-            if '\n' in self.buffer or len(self.buffer) > 1000:
-                lines = self.buffer.split('\n')
-                for line in lines[:-1]:
-                    self.process_line(line)
-                self.buffer = lines[-1]
-                self.flush_content()
-        else:
-            # Handle non-string content
-            self.st_component.write(str(content))
-        self.flush_content()
-
-    def process_line(self, line):
-        if any(keyword in line for keyword in ["Thought:", "Action:", "Action Input:", "Observation:", "Final Answer:"]):
-            self.flush_content()
-            self.current_section = line.split(':')[0]
-            formatted = self.format_output(line)
-            self.st_component.markdown(formatted)
-        elif self.current_section:
-            self.content_buffer.append(line.strip())
-
-    def flush_content(self):
-        if self.content_buffer:
-            content = " ".join(self.content_buffer)
-            try:
-                self.st_component.markdown(content, unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Error displaying content: {str(e)}")
-            self.content_buffer = []
-        if self.current_section:
-            try:
-                self.st_component.markdown("</div>", unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Error closing section: {str(e)}")
-
-    def format_output(self, content):
-        if "Thought:" in content:
-            return f'<div style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;">🤔 <strong style="color: #2c3e50;">Thought:</strong></div>\n\n{content.split("Thought:")[1].strip()}'
-        elif "Action:" in content:
-            return f'<div style="background-color: #e6f3ff; padding: 5px; border-radius: 3px;">🛠️ <strong style="color: #3498db;">Action:</strong></div>\n\n{content.split("Action:")[1].strip()}'
-        elif "Action Input:" in content:
-            return f'<div style="background-color: #fff5e6; padding: 5px; border-radius: 3px;">📥 <strong style="color: #e67e22;">Action Input:</strong></div>\n\n{content.split("Action Input:")[1].strip()}'
-        elif "Observation:" in content:
-            return f'<div style="background-color: #e6ffe6; padding: 5px; border-radius: 3px;">👁️ <strong style="color: #27ae60;">Observation:</strong></div>\n\n{content.split("Observation:")[1].strip()}'
-        elif "Final Answer:" in content:
-            answer = content.split("Final Answer:")[1].strip()
-            return f'<div style="background-color: #ffe6e6; padding: 5px; border-radius: 3px;">🎯 <strong style="color: #e74c3c;">Final Answer:</strong></div>\n\n{answer}'
-        else:
-            return content.strip()
+        self.buffer += str(content)
+        if len(self.buffer) > self.buffer_limit:
+            self.buffer = self.buffer[-self.buffer_limit:]
+        self.expander.markdown(f"```\n{self.buffer}\n```")
 
     def flush(self):
-        if self.buffer:
-            self.process_line(self.buffer)
-        self.flush_content()
-        self.buffer = ""
-        self.current_section = None
+        pass
 
 def log_memory_usage():
     process = psutil.Process(os.getpid())
@@ -209,10 +158,13 @@ if st.button('Draft Proposal'):
             logger.info(f"Processed: {uploaded_pdf.name}")
         logger.info(f"Total PDFs processed: {len(pdf_paths)}")
         
-        # Create a placeholder for live updates
-        crew_output_container = st.empty()
-        stream_to_st = StreamToSt(crew_output_container)
-        sys.stdout = stream_to_st
+        # Create an expander for live updates
+        crew_output_expander = st.expander("Crew Log", expanded=True)
+        stream_to_expander = StreamToExpander(crew_output_expander)
+
+        # Redirect stdout to our custom StreamToExpander
+        original_stdout = sys.stdout
+        sys.stdout = stream_to_expander
 
         # Initialize agents and tasks
         agents = CustomAgents(pdf_paths)
@@ -235,7 +187,7 @@ if st.button('Draft Proposal'):
         crew = Crew(
             agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
             tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
-            verbose=True
+            verbose=2  # Increase verbosity
         )
 
         # Run the crew
@@ -243,7 +195,7 @@ if st.button('Draft Proposal'):
             result = crew.kickoff()
 
         # Reset stdout
-        sys.stdout = sys.__stdout__
+        sys.stdout = original_stdout
 
         st.success("CrewAI Job Completed!")
         

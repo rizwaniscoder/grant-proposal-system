@@ -64,7 +64,7 @@ class StreamToSt:
             self.flush_content()
             self.current_section = line.split(':')[0]
             formatted = self.format_output(line)
-            self.st_component.markdown(f'<div class="fadeIn" style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px;">{formatted}</div>', unsafe_allow_html=True)
+            self.st_component.markdown(formatted)
         elif self.current_section:
             self.content_buffer.append(line.strip())
 
@@ -76,21 +76,16 @@ class StreamToSt:
             except Exception as e:
                 st.error(f"Error displaying content: {str(e)}")
             self.content_buffer = []
-        if self.current_section:
-            try:
-                self.st_component.markdown("</div>", unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Error closing section: {str(e)}")
 
     def format_output(self, content):
         if "Thought:" in content:
-            return f'<div style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;">🤔 <strong style="color: #2c3e50;">Thought:</strong></div> {content.split("Thought:")[1].strip()}'
+            return f'<div style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;">🤔 <strong style="color: #2c3e50;">Thought:</strong></div>\n\n{content.split("Thought:")[1].strip()}'
         elif "Action:" in content:
-            return f'<div style="background-color: #e6f3ff; padding: 5px; border-radius: 3px;">🛠️ <strong style="color: #3498db;">Action:</strong></div> {content.split("Action:")[1].strip()}'
+            return f'<div style="background-color: #e6f3ff; padding: 5px; border-radius: 3px;">🛠️ <strong style="color: #3498db;">Action:</strong></div>\n\n{content.split("Action:")[1].strip()}'
         elif "Action Input:" in content:
-            return f'<div style="background-color: #fff5e6; padding: 5px; border-radius: 3px;">📥 <strong style="color: #e67e22;">Action Input:</strong></div> {content.split("Action Input:")[1].strip()}'
+            return f'<div style="background-color: #fff5e6; padding: 5px; border-radius: 3px;">📥 <strong style="color: #e67e22;">Action Input:</strong></div>\n\n{content.split("Action Input:")[1].strip()}'
         elif "Observation:" in content:
-            return f'<div style="background-color: #e6ffe6; padding: 5px; border-radius: 3px;">👁️ <strong style="color: #27ae60;">Observation:</strong></div> {content.split("Observation:")[1].strip()}'
+            return f'<div style="background-color: #e6ffe6; padding: 5px; border-radius: 3px;">👁️ <strong style="color: #27ae60;">Observation:</strong></div>\n\n{content.split("Observation:")[1].strip()}'
         elif "Final Answer:" in content:
             answer = content.split("Final Answer:")[1].strip()
             return f'<div style="background-color: #ffe6e6; padding: 5px; border-radius: 3px;">🎯 <strong style="color: #e74c3c;">Final Answer:</strong></div>\n\n{answer}'
@@ -195,106 +190,23 @@ if uploaded_pdfs:
     st.success(f"Successfully uploaded {len(uploaded_pdfs)} file(s).")
 
 if st.button('Draft Proposal'):
-    logger.info("Draft Proposal button clicked")
-    
-    # Input validation
-    validation_error = False
-    
-    if not org_name or not proposal_background:
-        st.error("Please enter both the organization name and background information on the RFP / proposal.")
-        validation_error = True
-    
-    if not uploaded_pdfs:
-        st.error("Please upload at least one PDF file.")
-        validation_error = True
-    
-    if total_budget == 0:
-        st.error("Please enter a valid total budget.")
-        validation_error = True
-    
-    if validation_error:
-        st.stop()
-    
     try:
-        logger.info(f"Number of PDFs uploaded: {len(uploaded_pdfs)}")
+        st.info("Starting the crew. This process may take several minutes depending on the complexity of your documents and requirements. Please wait while our AI agents analyze and generate your proposal draft.")
         
-        # Process uploaded PDFs
-        pdf_paths = []
-        for uploaded_pdf in uploaded_pdfs:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                tmp_file.write(uploaded_pdf.getvalue())
-                pdf_paths.append(tmp_file.name)
-            logger.info(f"Processed: {uploaded_pdf.name}")
-        
-        logger.info(f"Total PDFs processed: {len(pdf_paths)}")
-
-        # Initialize agents and tasks
-        agents = CustomAgents(pdf_paths)
-        tasks = CustomTasks()
-        
-        # Set up agents and tasks
-        document_ingestion_agent = agents.document_ingestion_agent()
-        rfp_analysis_agent = agents.rfp_analysis_agent()
-        proposal_writer_agent = agents.proposal_writer_agent()
-        budget_specialist_agent = agents.budget_specialist_agent()
-        quality_assurance_agent = agents.quality_assurance_agent()
-        
-        document_ingestion_task = tasks.document_ingestion_task(document_ingestion_agent, org_name, proposal_background)
-        rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
-        proposal_writing_task = tasks.proposal_writing_task(proposal_writer_agent, "{{rfp_analysis_task.output}}", org_name)
-        budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}", total_budget)
-        quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}", "{{budget_preparation_task.output}}")
-
-        # Create crew
-        crew = Crew(
-            agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
-            tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
-            verbose=True
-        )
-
         # Create a placeholder for live updates
-        output_placeholder = st.empty()
-
-        # Create a function to update the output
-        def update_output(message, output_type="info"):
-            if output_type == "thought":
-                output_placeholder.markdown(f"🤔 **Thought:** {message}")
-            elif output_type == "action":
-                output_placeholder.markdown(f"🛠️ **Action:** {message}")
-            elif output_type == "observation":
-                output_placeholder.markdown(f"👁️ **Observation:** {message}")
-            elif output_type == "final_answer":
-                output_placeholder.markdown(f"🎯 **Final Answer:** {message}")
-            else:
-                output_placeholder.markdown(message)
-            time.sleep(0.1)  # Small delay to prevent overwhelming the UI
-
-        progress_bar = st.progress(0)
-
-        def update_progress(current_step, total_steps):
-            progress = int((current_step / total_steps) * 100)
-            progress_bar.progress(progress)
-
-        crew = Crew(
-            agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
-            tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
-            verbose=True,
-            callback=update_progress
-        )
+        crew_output_container = st.empty()
+        stream_to_st = StreamToSt(crew_output_container)
+        sys.stdout = stream_to_st
 
         # Run the crew
         with st.spinner("CrewAI Job in Progress..."):
-            for step in crew.kickoff():
-                if isinstance(step, dict):
-                    for key, value in step.items():
-                        update_output(value, key)
-                else:
-                    update_output(str(step))
+            result = crew.kickoff()
 
-            result = crew.get_final_output()  # Assuming there's a method to get the final result
+        # Reset stdout
+        sys.stdout = sys.__stdout__
 
         st.success("CrewAI Job Completed!")
-
+        
         # Process and display results
         st.subheader("📄 Final Proposal Draft")
         st.markdown(result)
@@ -306,10 +218,7 @@ if st.button('Draft Proposal'):
         )
         
     except Exception as e:
-        error_msg = f"An error occurred: {str(e)}"
-        logger.error(error_msg)
-        st.error(error_msg)
-        logger.error(traceback.format_exc())
+        st.error(f"An error occurred: {str(e)}")
         st.error("Please check the logs for more details and try again.")
     
     finally:

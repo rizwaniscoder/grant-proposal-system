@@ -198,10 +198,12 @@ if st.button('Draft Proposal'):
         sys.stdout = original_stdout
 
         st.success("CrewAI Job Completed!")
-        
+
         # Process and display results
         st.subheader("📄 Final Proposal Draft")
-        st.markdown(result)
+        st.markdown(result, unsafe_allow_html=True)
+
+        # Download button
         st.download_button(
             label="Download Proposal Draft",
             data=result,

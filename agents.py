@@ -29,12 +29,38 @@ class CustomAgents:
 
     def proposal_writer_agent(self):
         return Agent(
-            role='Grant Proposal Writer',
-            goal='Write compelling and comprehensive grant proposals',
-            backstory='You are a skilled writer with extensive experience in crafting successful grant proposals.',
-            tools=[],  # Empty list if no specific tools are needed
+            role='Proposal Writer',
+            goal='Write a comprehensive and compelling grant proposal',
+            backstory='You are an experienced grant writer with a track record of securing funding for various organizations.',
             verbose=True,
-            llm=self.get_groq_llm()
+            allow_delegation=False,
+            llm=self.get_groq_llm(),
+            tools=[],
+            instructions="""
+            Write a detailed grant proposal based on the provided information. 
+            Use markdown formatting for better readability. Include the following sections:
+            
+            # [Project Title]
+            
+            ## I. Executive Summary
+            
+            ## II. Organization Background
+            
+            ## III. Project Description
+            
+            ## IV. Goals and Objectives
+            
+            ## V. Methodology
+            
+            ## VI. Evaluation Plan
+            
+            ## VII. Budget
+            
+            ## VIII. Conclusion
+            
+            Use **bold** for emphasis, and *italics* for secondary emphasis.
+            Use bullet points or numbered lists where appropriate.
+            """
         )
 
     def budget_specialist_agent(self):

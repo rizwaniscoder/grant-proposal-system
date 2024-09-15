@@ -145,17 +145,31 @@ uploaded_pdfs = st.file_uploader("Drag and drop files here", type="pdf", accept_
 if uploaded_pdfs:
     st.success(f"Successfully uploaded {len(uploaded_pdfs)} file(s).")
 
-if st.button('Draft Proposal'):
+with st.form("input_form"):
+    org_name = st.text_input("Organization Name")
+    proposal_background = st.text_area("Proposal Background")
+    submitted = st.form_submit_button("Draft Proposal")
+
+if submitted:
     try:
         st.info("Starting the crew. This process may take several minutes depending on the complexity of your documents and requirements. Please wait while our AI agents analyze and generate your proposal draft.")
         
         # Create a placeholder for live updates
-        crew_output_container = st.empty()
-        stream_to_st = StreamToSt(crew_output_container)
+        crew_output_expander = st.expander("Crew Log", expanded=True)
+        stream_to_expander = StreamToExpander(crew_output_expander)
 
-        # Redirect stdout to our custom StreamToSt
+        # Redirect stdout to our custom StreamToExpander
         original_stdout = sys.stdout
-        sys.stdout = stream_to_st
+        sys.stdout = stream_to_expander
+
+        # Process uploaded PDFs
+        pdf_paths = []
+        for uploaded_pdf in uploaded_pdfs:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                tmp_file.write(uploaded_pdf.getvalue())
+                pdf_paths.append(tmp_file.name)
+            logger.info(f"Processed: {uploaded_pdf.name}")
+        logger.info(f"Total PDFs processed: {len(pdf_paths)}")
 
         # Initialize agents and tasks
         agents = CustomAgents(pdf_paths)
@@ -182,7 +196,11 @@ if st.button('Draft Proposal'):
         )
 
         # Run the crew
-        result = crew.kickoff()
+        with st.spinner("CrewAI Job in Progress..."):
+            try:
+                result = crew.kickoff()
+            except Exception as e:
+                st.error(f"An error occurred during the CrewAI process: {str(e)}")
 
         # Reset stdout
         sys.stdout = original_stdout

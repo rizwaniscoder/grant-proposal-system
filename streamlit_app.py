@@ -328,3 +328,6 @@ if __name__ == "__main__":
         st.write("Shutting down gracefully...")
     finally:
         st.stop()
+
+# Create a placeholder for logs
+log_placeholder = st.empty()

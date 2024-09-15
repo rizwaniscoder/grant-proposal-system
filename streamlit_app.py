@@ -149,22 +149,13 @@ if st.button('Draft Proposal'):
     try:
         st.info("Starting the crew. This process may take several minutes depending on the complexity of your documents and requirements. Please wait while our AI agents analyze and generate your proposal draft.")
         
-        # Process uploaded PDFs
-        pdf_paths = []
-        for uploaded_pdf in uploaded_pdfs:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                tmp_file.write(uploaded_pdf.getvalue())
-                pdf_paths.append(tmp_file.name)
-            logger.info(f"Processed: {uploaded_pdf.name}")
-        logger.info(f"Total PDFs processed: {len(pdf_paths)}")
-        
-        # Create an expander for live updates
-        crew_output_expander = st.expander("Crew Log", expanded=True)
-        stream_to_expander = StreamToExpander(crew_output_expander)
+        # Create a placeholder for live updates
+        crew_output_container = st.empty()
+        stream_to_st = StreamToSt(crew_output_container)
 
-        # Redirect stdout to our custom StreamToExpander
+        # Redirect stdout to our custom StreamToSt
         original_stdout = sys.stdout
-        sys.stdout = stream_to_expander
+        sys.stdout = stream_to_st
 
         # Initialize agents and tasks
         agents = CustomAgents(pdf_paths)
@@ -187,12 +178,11 @@ if st.button('Draft Proposal'):
         crew = Crew(
             agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
             tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
-            verbose=2  # Increase verbosity
+            verbose=True  # Change this from 2 to True
         )
 
         # Run the crew
-        with st.spinner("CrewAI Job in Progress..."):
-            result = crew.kickoff()
+        result = crew.kickoff()
 
         # Reset stdout
         sys.stdout = original_stdout

@@ -45,65 +45,64 @@ import streamlit as st
 from datetime import datetime
 
 def format_log_entry(log_entry):
-    # Extract timestamp
     timestamp_match = re.search(r'\[(.*?)\]', log_entry)
     timestamp = timestamp_match.group(1) if timestamp_match else "N/A"
     
-    # Extract action type (Thought, Action, Action Input, Observation)
-    action_type_match = re.search(r'^(Thought|Action|Action Input|Observation):', log_entry)
-    action_type = action_type_match.group(1) if action_type_match else "INFO"
+    action_type_match = re.search(r'\[(DEBUG|INFO|WARNING|ERROR)\]', log_entry)
+    action_type = action_type_match.group(1) if action_type_match else None
     
-    # Extract content (everything after the action type)
-    content = re.sub(r'^(Thought|Action|Action Input|Observation):', '', log_entry).strip()
+    agent_match = re.search(r'Working Agent: (.*?)(,|\n|$)', log_entry)
+    agent_name = agent_match.group(1) if agent_match else None
     
-    return timestamp, action_type, content
+    content = re.sub(r'^\[.*?\](\[.*?\])?', '', log_entry).strip()
+    
+    return timestamp, action_type, agent_name, content
 
 def display_formatted_log(log_entries):
-    st.markdown("---")
-    for log_entry in log_entries:
-        timestamp, action_type, content = format_log_entry(log_entry)
+    for entry in log_entries:
+        timestamp, action_type, agent_name, content = format_log_entry(entry)
         
-        if action_type == "Thought":
+        if action_type:
             st.markdown(f"**:clock1: {timestamp}**")
-            st.markdown(f"💭 **Thought:** {content}")
-        elif action_type == "Action":
-            st.markdown(f"🏃‍♂️ **Action:** {content}")
-        elif action_type == "Action Input":
-            st.markdown(f"📥 **Action Input:** {content}")
-        elif action_type == "Observation":
-            st.markdown(f"👁️ **Observation:** {content}")
+            st.markdown(f"**Type:** {action_type}")
+            if agent_name and agent_name.lower() != "unknown agent":
+                st.markdown(f"**Agent:** {agent_name}")
+            st.markdown("---")
+        
+        if content.startswith("Thought:"):
+            st.markdown("💭 **Thought:**")
+            st.text(content[8:].strip())
+        elif content.startswith("Action:"):
+            st.markdown("🏃‍♂️ **Action:**")
+            st.text(content[7:].strip())
+        elif content.startswith("Action Input:"):
+            st.markdown("📥 **Action Input:**")
+            st.text(content[13:].strip())
+        elif content.startswith("Observation:"):
+            st.markdown("👁️ **Observation:**")
+            st.text(content[12:].strip())
         else:
-            st.markdown(f"ℹ️ **{action_type}:** {content}")
+            st.text(content)
+        
+        st.markdown("---")
 
 class StreamToExpander:
     def __init__(self, expander):
         self.expander = expander
         self.buffer = []
-        self.current_group = []
-
+    
     def write(self, data):
-        lines = data.strip().split('\n')
-        for line in lines:
-            if line.startswith('Thought:') and self.current_group:
-                self.buffer.append(self.current_group)
-                self.current_group = []
-            self.current_group.append(line)
-        
-        if len(self.buffer) >= 2:
+        self.buffer.append(data.strip())
+        if len(self.buffer) >= 4 or any("Thought:" in line for line in self.buffer):
             with self.expander:
-                for group in self.buffer:
-                    display_formatted_log(group)
+                display_formatted_log(self.buffer)
             self.buffer = []
-
+    
     def flush(self):
-        if self.current_group:
-            self.buffer.append(self.current_group)
         if self.buffer:
             with self.expander:
-                for group in self.buffer:
-                    display_formatted_log(group)
+                display_formatted_log(self.buffer)
             self.buffer = []
-            self.current_group = []
 
 def log_memory_usage():
     process = psutil.Process(os.getpid())
@@ -199,9 +198,7 @@ if st.button('Draft Proposal'):
     try:
         st.info("Starting the crew. This process may take several minutes depending on the complexity of your documents and requirements. Please wait while our AI agents analyze and generate your proposal draft.")
         
-        # Create a placeholder for live updates
         crew_output_expander = st.expander("Crew Log", expanded=True)
-        
         stream_to_expander = StreamToExpander(crew_output_expander)
 
         # Redirect stdout to our custom StreamToExpander
@@ -251,7 +248,7 @@ if st.button('Draft Proposal'):
 
         st.success("CrewAI Job Completed!")
 
-        # Process and display results
+        # Display final results
         st.subheader("📄 Final Proposal Draft")
         st.markdown(result, unsafe_allow_html=True)
 

@@ -45,29 +45,38 @@ import streamlit as st
 from datetime import datetime
 
 def format_log_entry(log_entry):
+    # Extract timestamp
     timestamp_match = re.search(r'\[(.*?)\]', log_entry)
-    timestamp = timestamp_match.group(1) if timestamp_match else "N/A"
+    if timestamp_match:
+        try:
+            timestamp = datetime.strptime(timestamp_match.group(1), "%Y-%m-%d %H:%M:%S")
+            formatted_timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            formatted_timestamp = timestamp_match.group(1)
+    else:
+        formatted_timestamp = "N/A"
     
-    action_type_match = re.search(r'\[(DEBUG|INFO|WARNING|ERROR)\]', log_entry)
-    action_type = action_type_match.group(1) if action_type_match else None
+    # Extract log level (DEBUG, INFO, etc.)
+    log_level_match = re.search(r'\[(DEBUG|INFO|WARNING|ERROR)\]', log_entry)
+    log_level = log_level_match.group(1) if log_level_match else "ACTION"
     
+    # Extract agent name
     agent_match = re.search(r'Working Agent: (.*?)(,|\n|$)', log_entry)
     agent_name = agent_match.group(1) if agent_match else None
     
+    # Extract content (everything after the timestamp and log level)
     content = re.sub(r'^\[.*?\](\[.*?\])?', '', log_entry).strip()
     
-    return timestamp, action_type, agent_name, content
+    return formatted_timestamp, log_level, agent_name, content
 
 def display_formatted_log(log_entries):
     for entry in log_entries:
-        timestamp, action_type, agent_name, content = format_log_entry(entry)
+        timestamp, log_level, agent_name, content = format_log_entry(entry)
         
-        if action_type:
-            st.markdown(f"**:clock1: {timestamp}**")
-            st.markdown(f"**Type:** {action_type}")
-            if agent_name and agent_name.lower() != "unknown agent":
-                st.markdown(f"**Agent:** {agent_name}")
-            st.markdown("---")
+        st.markdown(f"**:clock1: {timestamp}**")
+        st.markdown(f"**Level:** {log_level}")
+        if agent_name and agent_name.lower() != "unknown agent":
+            st.markdown(f"**Agent:** {agent_name}")
         
         if content.startswith("Thought:"):
             st.markdown("💭 **Thought:**")

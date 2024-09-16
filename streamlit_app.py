@@ -40,20 +40,71 @@ except Exception as e:
 
 pdf_paths = []
 
+import re
+import streamlit as st
+from datetime import datetime
+
+def format_log_entry(log_entry):
+    # Extract timestamp
+    timestamp_match = re.search(r'\[(.*?)\]', log_entry)
+    timestamp = timestamp_match.group(1) if timestamp_match else "N/A"
+    
+    # Extract action type (DEBUG, INFO, etc.)
+    action_type_match = re.search(r'\[(DEBUG|INFO|WARNING|ERROR)\]', log_entry)
+    action_type = action_type_match.group(1) if action_type_match else "ACTION"
+    
+    # Extract agent name
+    agent_match = re.search(r'Working Agent: (.*?)(,|\n|$)', log_entry)
+    agent_name = agent_match.group(1) if agent_match else "Unknown Agent"
+    
+    # Extract content (everything after the timestamp and action type)
+    content = re.sub(r'^\[.*?\](\[.*?\])?', '', log_entry).strip()
+    
+    return timestamp, action_type, agent_name, content
+
+def display_formatted_log(log_entry):
+    timestamp, action_type, agent_name, content = format_log_entry(log_entry)
+    
+    st.markdown(f"**:clock1: {timestamp}**")
+    
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown(f"**Type:** {action_type}")
+        st.markdown(f"**Agent:** {agent_name}")
+    
+    with col2:
+        if action_type == "DEBUG":
+            st.markdown(f":bug: {content}")
+        elif action_type == "INFO":
+            st.markdown(f":information_source: {content}")
+        elif action_type == "WARNING":
+            st.markdown(f":warning: {content}")
+        elif action_type == "ERROR":
+            st.markdown(f":x: {content}")
+        else:
+            st.markdown(f":rocket: {content}")
+    
+    st.markdown("---")
+
 class StreamToExpander:
-    def __init__(self, expander, buffer_limit=10000):
+    def __init__(self, expander):
         self.expander = expander
         self.buffer = ""
-        self.buffer_limit = buffer_limit
-
-    def write(self, content):
-        self.buffer += str(content)
-        if len(self.buffer) > self.buffer_limit:
-            self.buffer = self.buffer[-self.buffer_limit:]
-        self.expander.markdown(f"```\n{self.buffer}\n```")
-
+    
+    def write(self, data):
+        self.buffer += data
+        if '\n' in self.buffer:
+            lines = self.buffer.split('\n')
+            for line in lines[:-1]:
+                with self.expander:
+                    display_formatted_log(line)
+            self.buffer = lines[-1]
+    
     def flush(self):
-        pass
+        if self.buffer:
+            with self.expander:
+                display_formatted_log(self.buffer)
+            self.buffer = ""
 
 def log_memory_usage():
     process = psutil.Process(os.getpid())
@@ -151,6 +202,7 @@ if st.button('Draft Proposal'):
         
         # Create a placeholder for live updates
         crew_output_expander = st.expander("Crew Log", expanded=True)
+        
         stream_to_expander = StreamToExpander(crew_output_expander)
 
         # Redirect stdout to our custom StreamToExpander
@@ -196,6 +248,7 @@ if st.button('Draft Proposal'):
 
         # Reset stdout
         sys.stdout = original_stdout
+        stream_to_expander.flush()  # Flush any remaining content
 
         st.success("CrewAI Job Completed!")
 

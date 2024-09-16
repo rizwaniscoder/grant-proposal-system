@@ -49,62 +49,61 @@ def format_log_entry(log_entry):
     timestamp_match = re.search(r'\[(.*?)\]', log_entry)
     timestamp = timestamp_match.group(1) if timestamp_match else "N/A"
     
-    # Extract action type (DEBUG, INFO, etc.)
-    action_type_match = re.search(r'\[(DEBUG|INFO|WARNING|ERROR)\]', log_entry)
-    action_type = action_type_match.group(1) if action_type_match else "ACTION"
+    # Extract action type (Thought, Action, Action Input, Observation)
+    action_type_match = re.search(r'^(Thought|Action|Action Input|Observation):', log_entry)
+    action_type = action_type_match.group(1) if action_type_match else "INFO"
     
-    # Extract agent name
-    agent_match = re.search(r'Working Agent: (.*?)(,|\n|$)', log_entry)
-    agent_name = agent_match.group(1) if agent_match else "Unknown Agent"
+    # Extract content (everything after the action type)
+    content = re.sub(r'^(Thought|Action|Action Input|Observation):', '', log_entry).strip()
     
-    # Extract content (everything after the timestamp and action type)
-    content = re.sub(r'^\[.*?\](\[.*?\])?', '', log_entry).strip()
-    
-    return timestamp, action_type, agent_name, content
+    return timestamp, action_type, content
 
-def display_formatted_log(log_entry):
-    timestamp, action_type, agent_name, content = format_log_entry(log_entry)
-    
-    st.markdown(f"**:clock1: {timestamp}**")
-    
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        st.markdown(f"**Type:** {action_type}")
-        st.markdown(f"**Agent:** {agent_name}")
-    
-    with col2:
-        if action_type == "DEBUG":
-            st.markdown(f":bug: {content}")
-        elif action_type == "INFO":
-            st.markdown(f":information_source: {content}")
-        elif action_type == "WARNING":
-            st.markdown(f":warning: {content}")
-        elif action_type == "ERROR":
-            st.markdown(f":x: {content}")
-        else:
-            st.markdown(f":rocket: {content}")
-    
+def display_formatted_log(log_entries):
     st.markdown("---")
+    for log_entry in log_entries:
+        timestamp, action_type, content = format_log_entry(log_entry)
+        
+        if action_type == "Thought":
+            st.markdown(f"**:clock1: {timestamp}**")
+            st.markdown(f"💭 **Thought:** {content}")
+        elif action_type == "Action":
+            st.markdown(f"🏃‍♂️ **Action:** {content}")
+        elif action_type == "Action Input":
+            st.markdown(f"📥 **Action Input:** {content}")
+        elif action_type == "Observation":
+            st.markdown(f"👁️ **Observation:** {content}")
+        else:
+            st.markdown(f"ℹ️ **{action_type}:** {content}")
 
 class StreamToExpander:
     def __init__(self, expander):
         self.expander = expander
-        self.buffer = ""
-    
+        self.buffer = []
+        self.current_group = []
+
     def write(self, data):
-        self.buffer += data
-        if '\n' in self.buffer:
-            lines = self.buffer.split('\n')
-            for line in lines[:-1]:
-                with self.expander:
-                    display_formatted_log(line)
-            self.buffer = lines[-1]
-    
+        lines = data.strip().split('\n')
+        for line in lines:
+            if line.startswith('Thought:') and self.current_group:
+                self.buffer.append(self.current_group)
+                self.current_group = []
+            self.current_group.append(line)
+        
+        if len(self.buffer) >= 2:
+            with self.expander:
+                for group in self.buffer:
+                    display_formatted_log(group)
+            self.buffer = []
+
     def flush(self):
+        if self.current_group:
+            self.buffer.append(self.current_group)
         if self.buffer:
             with self.expander:
-                display_formatted_log(self.buffer)
-            self.buffer = ""
+                for group in self.buffer:
+                    display_formatted_log(group)
+            self.buffer = []
+            self.current_group = []
 
 def log_memory_usage():
     process = psutil.Process(os.getpid())

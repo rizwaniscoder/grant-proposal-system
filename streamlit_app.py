@@ -70,6 +70,16 @@ def format_log_entry(log_entry):
     return formatted_timestamp, log_level, agent_name, content
 
 def display_formatted_log(log_entries):
+    # Add custom CSS to force text wrapping
+    st.markdown("""
+    <style>
+    .stMarkdown, .stText {
+        word-wrap: break-word;
+        white-space: pre-wrap;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     for entry in log_entries:
         timestamp, log_level, agent_name, content = format_log_entry(entry)
         
@@ -78,20 +88,21 @@ def display_formatted_log(log_entries):
         if agent_name and agent_name.lower() != "unknown agent":
             st.markdown(f"**Agent:** {agent_name}")
         
+        # Use st.markdown with custom CSS class for content
         if content.startswith("Thought:"):
             st.markdown("💭 **Thought:**")
-            st.text(content[8:].strip())
+            st.markdown(f'<div class="stText">{content[8:].strip()}</div>', unsafe_allow_html=True)
         elif content.startswith("Action:"):
             st.markdown("🏃‍♂️ **Action:**")
-            st.text(content[7:].strip())
+            st.markdown(f'<div class="stText">{content[7:].strip()}</div>', unsafe_allow_html=True)
         elif content.startswith("Action Input:"):
             st.markdown("📥 **Action Input:**")
-            st.text(content[13:].strip())
+            st.markdown(f'<div class="stText">{content[13:].strip()}</div>', unsafe_allow_html=True)
         elif content.startswith("Observation:"):
             st.markdown("👁️ **Observation:**")
-            st.text(content[12:].strip())
+            st.markdown(f'<div class="stText">{content[12:].strip()}</div>', unsafe_allow_html=True)
         else:
-            st.text(content)
+            st.markdown(f'<div class="stText">{content}</div>', unsafe_allow_html=True)
         
         st.markdown("---")
 

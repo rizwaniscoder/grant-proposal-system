@@ -70,48 +70,32 @@ def format_log_entry(log_entry):
     return formatted_timestamp, log_level, agent_name, content
 
 def display_formatted_log(log_entries):
-    current_group = []
     for entry in log_entries:
         timestamp, log_level, agent_name, content = format_log_entry(entry)
         
-        if content.startswith("Thought:") and current_group:
-            # Display the previous group
-            display_group(current_group)
-            current_group = []
+        st.markdown(f"**{log_level}** - {timestamp}")
+        if agent_name and agent_name.lower() != "unknown agent":
+            st.markdown(f"**Agent:** {agent_name}")
         
-        current_group.append((timestamp, log_level, agent_name, content))
-    
-    # Display the last group
-    if current_group:
-        display_group(current_group)
-
-def display_group(group):
-    with st.expander(f"{group[0][1]} - {group[0][3][:30]}...", expanded=True):
-        for timestamp, log_level, agent_name, content in group:
-            with st.container():
-                st.caption(f":clock1: {timestamp}")
-                if agent_name and agent_name.lower() != "unknown agent":
-                    st.markdown(f"**Agent:** {agent_name}")
-                
-                if content.startswith("Thought:"):
-                    st.markdown("💭 **Thought:**")
-                    st.info(content[8:].strip())
-                elif content.startswith("Action:"):
-                    st.markdown("🏃‍♂️ **Action:**")
-                    st.success(content[7:].strip())
-                elif content.startswith("Action Input:"):
-                    st.markdown("📥 **Action Input:**")
-                    st.code(content[13:].strip())
-                elif content.startswith("Observation:"):
-                    st.markdown("👁️ **Observation:**")
-                    st.warning(content[12:].strip())
-                elif content.startswith("Final Answer:"):
-                    st.markdown("🎯 **Final Answer:**")
-                    st.markdown(content[13:].strip())
-                else:
-                    st.text(content)
-    
-    st.divider()
+        if content.startswith("Thought:"):
+            st.markdown("💭 **Thought:**")
+            st.info(content[8:].strip())
+        elif content.startswith("Action:"):
+            st.markdown("🏃‍♂️ **Action:**")
+            st.success(content[7:].strip())
+        elif content.startswith("Action Input:"):
+            st.markdown("📥 **Action Input:**")
+            st.code(content[13:].strip())
+        elif content.startswith("Observation:"):
+            st.markdown("👁️ **Observation:**")
+            st.warning(content[12:].strip())
+        elif content.startswith("Final Answer:"):
+            st.markdown("🎯 **Final Answer:**")
+            st.markdown(content[13:].strip())
+        else:
+            st.text(content)
+        
+        st.divider()
 
 class StreamToExpander:
     def __init__(self, expander):

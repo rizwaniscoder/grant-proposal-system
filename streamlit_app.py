@@ -98,21 +98,18 @@ def display_formatted_log(log_entries):
         st.divider()
 
 class StreamToExpander:
-    def __init__(self, expander):
-        self.expander = expander
+    def __init__(self):
         self.buffer = []
     
     def write(self, data):
         self.buffer.append(data.strip())
         if len(self.buffer) >= 4 or any("Final Answer:" in line for line in self.buffer):
-            with self.expander:
-                display_formatted_log(self.buffer)
+            display_formatted_log(self.buffer)
             self.buffer = []
     
     def flush(self):
         if self.buffer:
-            with self.expander:
-                display_formatted_log(self.buffer)
+            display_formatted_log(self.buffer)
             self.buffer = []
 
 def log_memory_usage():
@@ -210,8 +207,7 @@ if st.button('Draft Proposal'):
         with st.status("Generating Proposal...", expanded=True) as status:
             st.info("Starting the crew. This process may take several minutes.")
             
-            crew_output_expander = st.expander("Crew Log", expanded=True)
-            stream_to_expander = StreamToExpander(crew_output_expander)
+            stream_to_expander = StreamToExpander()
 
             # Redirect stdout to our custom StreamToExpander
             original_stdout = sys.stdout
@@ -270,6 +266,7 @@ if st.button('Draft Proposal'):
 
         # Display final results
         st.subheader("📄 Final Proposal Draft")
+        
         final_proposal = st.container()
         with final_proposal:
             st.markdown("""
@@ -294,7 +291,7 @@ if st.button('Draft Proposal'):
             file_name="proposal_draft.md",
             mime="text/markdown"
         )
-        
+
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
         st.error("Please check the logs for more details and try again.")

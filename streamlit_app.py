@@ -70,41 +70,48 @@ def format_log_entry(log_entry):
     return formatted_timestamp, log_level, agent_name, content
 
 def display_formatted_log(log_entries):
-    # Add custom CSS to force text wrapping
-    st.markdown("""
-    <style>
-    .stMarkdown, .stText {
-        word-wrap: break-word;
-        white-space: pre-wrap;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
+    current_group = []
     for entry in log_entries:
         timestamp, log_level, agent_name, content = format_log_entry(entry)
         
-        st.markdown(f"**:clock1: {timestamp}**")
-        st.markdown(f"**Level:** {log_level}")
-        if agent_name and agent_name.lower() != "unknown agent":
-            st.markdown(f"**Agent:** {agent_name}")
+        if content.startswith("Thought:") and current_group:
+            # Display the previous group
+            display_group(current_group)
+            current_group = []
         
-        # Use st.markdown with custom CSS class for content
-        if content.startswith("Thought:"):
-            st.markdown("💭 **Thought:**")
-            st.markdown(f'<div class="stText">{content[8:].strip()}</div>', unsafe_allow_html=True)
-        elif content.startswith("Action:"):
-            st.markdown("🏃‍♂️ **Action:**")
-            st.markdown(f'<div class="stText">{content[7:].strip()}</div>', unsafe_allow_html=True)
-        elif content.startswith("Action Input:"):
-            st.markdown("📥 **Action Input:**")
-            st.markdown(f'<div class="stText">{content[13:].strip()}</div>', unsafe_allow_html=True)
-        elif content.startswith("Observation:"):
-            st.markdown("👁️ **Observation:**")
-            st.markdown(f'<div class="stText">{content[12:].strip()}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="stText">{content}</div>', unsafe_allow_html=True)
-        
-        st.markdown("---")
+        current_group.append((timestamp, log_level, agent_name, content))
+    
+    # Display the last group
+    if current_group:
+        display_group(current_group)
+
+def display_group(group):
+    with st.expander(f"{group[0][1]} - {group[0][3][:30]}...", expanded=True):
+        for timestamp, log_level, agent_name, content in group:
+            with st.container():
+                st.caption(f":clock1: {timestamp}")
+                if agent_name and agent_name.lower() != "unknown agent":
+                    st.markdown(f"**Agent:** {agent_name}")
+                
+                if content.startswith("Thought:"):
+                    st.markdown("💭 **Thought:**")
+                    st.info(content[8:].strip())
+                elif content.startswith("Action:"):
+                    st.markdown("🏃‍♂️ **Action:**")
+                    st.success(content[7:].strip())
+                elif content.startswith("Action Input:"):
+                    st.markdown("📥 **Action Input:**")
+                    st.code(content[13:].strip())
+                elif content.startswith("Observation:"):
+                    st.markdown("👁️ **Observation:**")
+                    st.warning(content[12:].strip())
+                elif content.startswith("Final Answer:"):
+                    st.markdown("🎯 **Final Answer:**")
+                    st.markdown(content[13:].strip())
+                else:
+                    st.text(content)
+    
+    st.divider()
 
 class StreamToExpander:
     def __init__(self, expander):
@@ -113,7 +120,7 @@ class StreamToExpander:
     
     def write(self, data):
         self.buffer.append(data.strip())
-        if len(self.buffer) >= 4 or any("Thought:" in line for line in self.buffer):
+        if len(self.buffer) >= 4 or any("Final Answer:" in line for line in self.buffer):
             with self.expander:
                 display_formatted_log(self.buffer)
             self.buffer = []
@@ -179,13 +186,13 @@ st.markdown("""
         100% { opacity: 1; }
     }
     .fadeIn {
-        animation: fadeIn 0.5s ease-in-out;
+        animation: fadeIn 1s ease-in-out;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # Add the title and description at the top of the app
-st.title('📋 ProposalCraft')
+st.title(' ProposalCraft')
 st.markdown('Generate comprehensive proposal drafts using AI analysis of your RFP documents.')
 
 # Background section
@@ -216,61 +223,85 @@ if uploaded_pdfs:
 
 if st.button('Draft Proposal'):
     try:
-        st.info("Starting the crew. This process may take several minutes depending on the complexity of your documents and requirements. Please wait while our AI agents analyze and generate your proposal draft.")
-        
-        crew_output_expander = st.expander("Crew Log", expanded=True)
-        stream_to_expander = StreamToExpander(crew_output_expander)
+        with st.status("Generating Proposal...", expanded=True) as status:
+            st.info("Starting the crew. This process may take several minutes.")
+            
+            crew_output_expander = st.expander("Crew Log", expanded=True)
+            stream_to_expander = StreamToExpander(crew_output_expander)
 
-        # Redirect stdout to our custom StreamToExpander
-        original_stdout = sys.stdout
-        sys.stdout = stream_to_expander
+            # Redirect stdout to our custom StreamToExpander
+            original_stdout = sys.stdout
+            sys.stdout = stream_to_expander
 
-        # Process uploaded PDFs
-        pdf_paths = []
-        for uploaded_pdf in uploaded_pdfs:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                tmp_file.write(uploaded_pdf.getvalue())
-                pdf_paths.append(tmp_file.name)
-            logger.info(f"Processed: {uploaded_pdf.name}")
-        logger.info(f"Total PDFs processed: {len(pdf_paths)}")
+            # Process uploaded PDFs
+            pdf_paths = []
+            for uploaded_pdf in uploaded_pdfs:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                    tmp_file.write(uploaded_pdf.getvalue())
+                    pdf_paths.append(tmp_file.name)
+                logger.info(f"Processed: {uploaded_pdf.name}")
+            logger.info(f"Total PDFs processed: {len(pdf_paths)}")
 
-        # Initialize agents and tasks
-        agents = CustomAgents(pdf_paths)
-        tasks = CustomTasks()
+            # Initialize agents and tasks
+            agents = CustomAgents(pdf_paths)
+            tasks = CustomTasks()
 
-        # Set up agents and tasks
-        document_ingestion_agent = agents.document_ingestion_agent()
-        rfp_analysis_agent = agents.rfp_analysis_agent()
-        proposal_writer_agent = agents.proposal_writer_agent()
-        budget_specialist_agent = agents.budget_specialist_agent()
-        quality_assurance_agent = agents.quality_assurance_agent()
+            # Set up agents and tasks
+            document_ingestion_agent = agents.document_ingestion_agent()
+            rfp_analysis_agent = agents.rfp_analysis_agent()
+            proposal_writer_agent = agents.proposal_writer_agent()
+            budget_specialist_agent = agents.budget_specialist_agent()
+            quality_assurance_agent = agents.quality_assurance_agent()
 
-        document_ingestion_task = tasks.document_ingestion_task(document_ingestion_agent, org_name, proposal_background)
-        rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
-        proposal_writing_task = tasks.proposal_writing_task(proposal_writer_agent, "{{rfp_analysis_task.output}}", org_name)
-        budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}", total_budget)
-        quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}", "{{budget_preparation_task.output}}")
+            document_ingestion_task = tasks.document_ingestion_task(document_ingestion_agent, org_name, proposal_background)
+            rfp_analysis_task = tasks.rfp_analysis_task(rfp_analysis_agent)
+            proposal_writing_task = tasks.proposal_writing_task(proposal_writer_agent, "{{rfp_analysis_task.output}}", org_name)
+            budget_preparation_task = tasks.budget_preparation_task(budget_specialist_agent, "{{proposal_writing_task.output}}", total_budget)
+            quality_review_task = tasks.quality_review_task(quality_assurance_agent, "{{proposal_writing_task.output}}", "{{budget_preparation_task.output}}")
 
-        # Create crew
-        crew = Crew(
-            agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
-            tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
-            verbose=True
-        )
+            # Create crew
+            crew = Crew(
+                agents=[document_ingestion_agent, rfp_analysis_agent, proposal_writer_agent, budget_specialist_agent, quality_assurance_agent],
+                tasks=[document_ingestion_task, rfp_analysis_task, proposal_writing_task, budget_preparation_task, quality_review_task],
+                verbose=True
+            )
 
-        # Run the crew
-        with st.spinner("CrewAI Job in Progress..."):
+            # Run the crew
+            status.update(label="Analyzing documents...", state="running")
+            # Run document analysis tasks
+            
+            status.update(label="Drafting proposal...", state="running")
+            # Run proposal writing tasks
+            
+            status.update(label="Finalizing...", state="running")
             result = crew.kickoff()
+
+            status.update(label="Proposal Draft Completed!", state="complete")
 
         # Reset stdout
         sys.stdout = original_stdout
-        stream_to_expander.flush()  # Flush any remaining content
+        stream_to_expander.flush()
 
         st.success("CrewAI Job Completed!")
 
         # Display final results
         st.subheader("📄 Final Proposal Draft")
-        st.markdown(result, unsafe_allow_html=True)
+        final_proposal = st.container()
+        with final_proposal:
+            st.markdown("""
+            <style>
+            .final-proposal {
+                border: 2px solid #4CAF50;
+                border-radius: 10px;
+                padding: 20px;
+                margin-top: 20px;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            st.markdown('<div class="final-proposal">', unsafe_allow_html=True)
+            st.markdown(result, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # Download button
         st.download_button(
